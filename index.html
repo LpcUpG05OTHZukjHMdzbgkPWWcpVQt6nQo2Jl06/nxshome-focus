@@ -75,13 +75,23 @@
         .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
         .toast.success { border-color: #53A9AE; color: #53A9AE; }
 
+        /* Secret Debug Modal (Blurred Background) */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); display: none; justify-content: center; align-items: center; z-index: 2000; padding: 16px; animation: fadeIn 0.25s ease-out; }
+        .modal-card { background: #181818; border: 1px solid #53A9AE; border-radius: 20px; width: 100%; max-width: 440px; padding: 20px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2A2A2A; padding-bottom: 10px; }
+        .modal-title { color: #53A9AE; font-size: 1rem; font-weight: bold; letter-spacing: 0.5px; }
+        .debug-console { background: #0A0A0A; border: 1px solid #2A2A2A; border-radius: 10px; padding: 12px; font-family: monospace; font-size: 0.78rem; color: #A0A0A0; height: 180px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+        .log-success { color: #53A9AE; }
+        .log-error { color: #E57373; }
+        .log-info { color: #888; }
+
         @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1 id="titleHeader" title="3x klicken für Test-Push">NEXUS // FOCUS</h1>
+            <h1 id="titleHeader" title="3x Klick: Test-Push | 5x Klick: Debug Console">NEXUS // FOCUS</h1>
             <div class="header-actions">
                 <button class="btn-icon" onclick="toggleSyncPanel()">📶 Sync</button>
                 <button class="btn-icon" id="notifBtn" onclick="toggleNotifications()">🔔 Push</button>
@@ -89,7 +99,7 @@
             </div>
         </header>
 
-        <!-- Sync Panel mit Node-RED LAN-Sync & Fallbacks -->
+        <!-- Sync Panel -->
         <div class="sync-card" id="syncPanel">
             <div class="sync-title">
                 <span>GERÄTE ABGLEICH</span>
@@ -101,7 +111,7 @@
                 <!-- Node-RED LAN Sync -->
                 <div style="display: flex; flex-direction: column; gap: 4px;">
                     <div class="node-red-box">
-                        <input type="text" id="nodeRedUrl" placeholder="z.B. http://192.168.2.49:1880/nexus-sync" value="http://192.168.2.49:1880/nexus-sync">
+                        <input type="text" id="nodeRedUrl" value="http://192.168.2.49:1880/endpoint/nexus-sync">
                         <button class="sync-btn" style="width: 120px; margin:0;" onclick="syncViaNodeRed()">🔄 LAN Sync</button>
                     </div>
                 </div>
@@ -127,6 +137,22 @@
     </div>
     
     <div id="toast" class="toast success">Erledigt</div>
+
+    <!-- Secret Debug Modal Overlay -->
+    <div class="modal-overlay" id="debugModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <span class="modal-title">🛠️ NODE-RED DIAGNOSTICS</span>
+                <span style="cursor:pointer; color:#888; font-weight:bold;" onclick="closeDebugModal()">✕</span>
+            </div>
+            <div style="font-size:0.8rem; color:#888;">Führt eine direkte Test-Anfrage an den konfigurierten Node-RED Endpunkt aus:</div>
+            <div class="debug-console" id="debugConsole">System bereit. Warte auf Testlauf...</div>
+            <div style="display:flex; gap:8px;">
+                <button class="add-btn" style="background:#53A9AE; color:#121212;" onclick="runNodeRedDiagnose()">Test ausführen</button>
+                <button class="add-btn" style="background:#2A2A2A; color:#FFF;" onclick="closeDebugModal()">Schließen</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         // --- SERVICE WORKER & PUSH NOTIFICATIONS ---
@@ -249,6 +275,71 @@
             }
         }
 
+        // --- SECRET DEBUG MODAL LOGIK (5x KLICK) ---
+        let titleClickCount = 0;
+        let titleClickTimer = null;
+        document.getElementById('titleHeader').addEventListener('click', () => {
+            titleClickCount++;
+            clearTimeout(titleClickTimer);
+            
+            if (titleClickCount === 3) {
+                triggerTestPush();
+            } else if (titleClickCount === 5) {
+                titleClickCount = 0;
+                openDebugModal();
+                return;
+            }
+            
+            titleClickTimer = setTimeout(() => { titleClickCount = 0; }, 700);
+        });
+
+        function openDebugModal() {
+            document.getElementById('debugModal').style.display = 'flex';
+            runNodeRedDiagnose();
+        }
+
+        function closeDebugModal() {
+            document.getElementById('debugModal').style.display = 'none';
+        }
+
+        async function runNodeRedDiagnose() {
+            const consoleBox = document.getElementById('debugConsole');
+            const url = document.getElementById('nodeRedUrl').value.trim();
+            
+            consoleBox.innerHTML = `<span class="log-info">[INIT] Starte Verbindungstest...</span>\nTarget: ${url}\n`;
+            
+            const startTime = performance.now();
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ todos, debug: true }),
+                    signal: AbortSignal.timeout(4000)
+                });
+                
+                const duration = Math.round(performance.now() - startTime);
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    consoleBox.innerHTML += `<span class="log-success">[SUCCESS] Status: ${res.status} OK (${duration}ms)</span>\n`;
+                    consoleBox.innerHTML += `<span class="log-info">Empfangene Tasks: ${data.todos ? data.todos.length : 0}</span>\n`;
+                    consoleBox.innerHTML += `Response Payload:\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    consoleBox.innerHTML += `<span class="log-error">[HTTP ERROR] Status: ${res.status} ${res.statusText}</span>\n`;
+                    consoleBox.innerHTML += `Der Node-RED Endpunkt hat mit einem Fehler reagiert.`;
+                }
+            } catch (e) {
+                consoleBox.innerHTML += `<span class="log-error">[NETWORK ERROR] ${e.name}: ${e.message}</span>\n\n`;
+                if (e.name === 'TimeoutError') {
+                    consoleBox.innerHTML += `<span class="log-info">Ursache: Zeitüberschreitung. Prüfe, ob die IP (192.168.2.49) im selben WLAN erreichbar ist.</span>`;
+                } else if (window.location.protocol === 'https:' && url.startsWith('http:')) {
+                    consoleBox.innerHTML += `<span class="log-info">Ursache: HTTPS Mixed-Content Blockade! Der Browser sperrt Anfragen von HTTPS (Cloudflare) auf HTTP (LAN IP).</span>`;
+                } else {
+                    consoleBox.innerHTML += `<span class="log-info">Ursache: Node-RED offline, CORS gefiltert oder IP falsch.</span>`;
+                }
+            }
+        }
+
         // --- UNIVERSAL QR-CODE SYNC ---
         function showQRCodeSync() {
             const container = document.getElementById('qrcodeContainer');
@@ -341,19 +432,6 @@
                 btn.innerText = '🔔 Push';
             }
         }
-
-        let titleClickCount = 0;
-        let titleClickTimer = null;
-        document.getElementById('titleHeader').addEventListener('click', () => {
-            titleClickCount++;
-            clearTimeout(titleClickTimer);
-            if (titleClickCount === 3) {
-                titleClickCount = 0;
-                triggerTestPush();
-            } else {
-                titleClickTimer = setTimeout(() => { titleClickCount = 0; }, 600);
-            }
-        });
 
         function triggerTestPush() {
             if (Notification.permission !== 'granted') return toggleNotifications();
