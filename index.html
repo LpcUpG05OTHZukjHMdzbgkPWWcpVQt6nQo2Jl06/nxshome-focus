@@ -23,6 +23,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#121212">
     
+    <!-- QRCode.js Bibliothek für den universellen Kamera-Fallback -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
         body { background-color: #121212; color: #E0E0E0; min-height: 100vh; padding: 24px 16px; display: flex; flex-direction: column; align-items: center; }
@@ -44,12 +47,15 @@
         button.add-btn { background: #53A9AE; border: none; border-radius: 10px; color: #121212; font-weight: bold; font-size: 0.95rem; padding: 10px 20px; cursor: pointer; flex: 1; }
         button.add-btn:active { opacity: 0.8; }
 
-        /* Direct P2P Sync Panel */
+        /* Sync Panel */
         .sync-card { background: #1E1E1E; border: 1px solid #53A9AE; border-radius: 16px; padding: 14px; display: none; flex-direction: column; gap: 10px; animation: fadeIn 0.2s ease-in-out; }
         .sync-title { font-size: 0.9rem; font-weight: bold; color: #53A9AE; display: flex; justify-content: space-between; align-items: center; }
         .sync-actions { display: flex; flex-direction: column; gap: 8px; }
         .sync-btn { background: #121212; border: 1px solid #2A2A2A; color: #FFF; border-radius: 10px; padding: 10px; font-size: 0.85rem; cursor: pointer; text-align: center; transition: all 0.2s; }
         .sync-btn:hover { border-color: #53A9AE; }
+        
+        /* QR Container */
+        #qrcodeContainer { display: flex; justify-content: center; background: #FFF; padding: 12px; border-radius: 10px; margin-top: 6px; }
 
         ul.todo-list { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
         li.todo-item { background: #1E1E1E; border: 1px solid #2A2A2A; border-radius: 14px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: flex-start; animation: fadeIn 0.2s ease-in-out; }
@@ -74,24 +80,26 @@
         <header>
             <h1 id="titleHeader" title="3x klicken für Test-Push">NEXUS // FOCUS</h1>
             <div class="header-actions">
-                <button class="btn-icon" onclick="toggleSyncPanel()">📶 P2P</button>
+                <button class="btn-icon" onclick="toggleSyncPanel()">📶 Sync</button>
                 <button class="btn-icon" id="notifBtn" onclick="toggleNotifications()">🔔 Push</button>
                 <span class="count-tag" id="count">0 Aufgaben</span>
             </div>
         </header>
 
-        <!-- P2P Sync Card -->
+        <!-- Sync Panel mit universellen Fallbacks -->
         <div class="sync-card" id="syncPanel">
             <div class="sync-title">
-                <span>DIREKTER P2P ABGLEICH</span>
+                <span>GERÄTE ABGLEICH (UNIVERSAL)</span>
                 <span style="cursor:pointer; color:#888;" onclick="toggleSyncPanel()">✕</span>
             </div>
             <div class="sync-actions">
-                <button class="sync-btn" onclick="syncViaBluetooth()">📡 Per Web Bluetooth koppeln</button>
-                <button class="sync-btn" onclick="exportJSON()">💾 Paket exportieren (.json)</button>
+                <button class="sync-btn" onclick="syncViaBluetooth()">📡 Web Bluetooth (PC/Android)</button>
+                <button class="sync-btn" onclick="showQRCodeSync()">📷 Per QR-Code übertragen (Universal)</button>
+                <button class="sync-btn" onclick="exportJSON()">💾 Datei-Backup (.json)</button>
                 <button class="sync-btn" onclick="document.getElementById('importFile').click()">📥 Paket importieren</button>
                 <input type="file" id="importFile" style="display:none;" accept=".json" onchange="importJSON(event)">
             </div>
+            <div id="qrcodeContainer" style="display:none;"></div>
         </div>
 
         <div class="input-card">
@@ -171,44 +179,64 @@
         function toggleSyncPanel() {
             const panel = document.getElementById('syncPanel');
             panel.style.display = (panel.style.display === 'flex') ? 'none' : 'flex';
+            document.getElementById('qrcodeContainer').style.display = 'none';
         }
 
-        // --- WEB BLUETOOTH SYNC (SERVERLOS & DIREKT) ---
+        // --- WEB BLUETOOTH SYNC ---
         const NEXUS_SERVICE_UUID = '12345678-1234-5678-1234-567812345678';
         const NEXUS_CHAR_UUID    = '87654321-4321-6543-2187-654321876543';
 
         async function syncViaBluetooth() {
             if (!navigator.bluetooth) {
-                showToast('Bluetooth im Browser nicht unterstützt');
+                showToast('Bluetooth wird hier nicht unterstützt (Nutze QR-Code!)');
                 return;
             }
-
             try {
                 showToast('Suche Bluetooth-Gerät...');
                 const device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
                     optionalServices: [NEXUS_SERVICE_UUID]
                 });
-
-                showToast('Verbinde mit ' + device.name + '...');
                 const server = await device.gatt.connect();
                 const service = await server.getPrimaryService(NEXUS_SERVICE_UUID);
                 const characteristic = await service.getCharacteristic(NEXUS_CHAR_UUID);
 
-                // Daten senden
                 const encoder = new TextEncoder();
-                const payload = JSON.stringify(todos);
-                await characteristic.writeValue(encoder.encode(payload));
-
+                await characteristic.writeValue(encoder.encode(JSON.stringify(todos)));
                 showToast('Bluetooth-Sync erfolgreich!');
                 device.gatt.disconnect();
             } catch (error) {
-                console.log('Bluetooth-Sync abgebrochen:', error);
-                showToast('Bluetooth-Abgleich beendet');
+                showToast('Bluetooth-Abgleich abgebrochen');
             }
         }
 
-        // --- MANUELLER DIREKT-EXPORT / IMPORT (P2P FALLBACK) ---
+        // --- UNIVERSAL QR-CODE SYNC (Funktioniert auf jedem iPad / Safari / Handy) ---
+        function showQRCodeSync() {
+            const container = document.getElementById('qrcodeContainer');
+            container.innerHTML = '';
+            container.style.display = 'flex';
+
+            // Komprimiere To-Dos als JSON-String
+            const payload = JSON.stringify(todos);
+            
+            // Da QR-Codes eine Zeichenbegrenzung haben, generieren wir einen kompakten String oder nutzen den Standard-Export
+            if (payload.length > 1500) {
+                showToast('Zu viele Aufgaben für QR-Code. Nutze Datei-Export!');
+                return;
+            }
+
+            new QRCode(container, {
+                text: payload,
+                width: 200,
+                height: 200,
+                colorDark: "#121212",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.L
+            });
+            showToast('QR-Code generiert (Mit Kamera scannen)');
+        }
+
+        // --- FILE EXPORT / IMPORT FALLBACK ---
         function exportJSON() {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(todos, null, 2));
             const downloadAnchor = document.createElement('a');
@@ -245,7 +273,6 @@
                     updated = true;
                 }
             });
-
             if (updated) {
                 todos.sort((a, b) => b.id - a.id);
                 saveAndRender();
