@@ -23,7 +23,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#121212">
     
-    <!-- QRCode.js Bibliothek für den universellen Kamera-Fallback -->
+    <!-- QRCode.js für universellen Fallback -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     
     <style>
@@ -54,7 +54,10 @@
         .sync-btn { background: #121212; border: 1px solid #2A2A2A; color: #FFF; border-radius: 10px; padding: 10px; font-size: 0.85rem; cursor: pointer; text-align: center; transition: all 0.2s; }
         .sync-btn:hover { border-color: #53A9AE; }
         
-        /* QR Container */
+        .subnet-box { display: flex; gap: 6px; margin-top: 4px; }
+        .subnet-box input { background: #121212; border: 1px solid #2A2A2A; border-radius: 8px; padding: 8px; color: #FFF; font-size: 0.85rem; width: 100%; outline: none; }
+        .subnet-box input:focus { border-color: #53A9AE; }
+
         #qrcodeContainer { display: flex; justify-content: center; background: #FFF; padding: 12px; border-radius: 10px; margin-top: 6px; }
 
         ul.todo-list { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
@@ -86,15 +89,24 @@
             </div>
         </header>
 
-        <!-- Sync Panel mit universellen Fallbacks -->
+        <!-- Sync Panel mit LAN-Scanner & Fallbacks -->
         <div class="sync-card" id="syncPanel">
             <div class="sync-title">
-                <span>GERÄTE ABGLEICH (UNIVERSAL)</span>
+                <span>GERÄTE ABGLEICH</span>
                 <span style="cursor:pointer; color:#888;" onclick="toggleSyncPanel()">✕</span>
             </div>
             <div class="sync-actions">
                 <button class="sync-btn" onclick="syncViaBluetooth()">📡 Web Bluetooth (PC/Android)</button>
-                <button class="sync-btn" onclick="showQRCodeSync()">📷 Per QR-Code übertragen (Universal)</button>
+                
+                <!-- LAN Subnet Auto-Discovery -->
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <div class="subnet-box">
+                        <input type="text" id="subnetPrefix" placeholder="z.B. 192.168.2" value="192.168.2">
+                        <button class="sync-btn" style="width: 130px; margin:0;" onclick="scanSubnetForPeers()">🔍 WLAN Scannen</button>
+                    </div>
+                </div>
+
+                <button class="sync-btn" onclick="showQRCodeSync()">📷 Per QR-Code übertragen</button>
                 <button class="sync-btn" onclick="exportJSON()">💾 Datei-Backup (.json)</button>
                 <button class="sync-btn" onclick="document.getElementById('importFile').click()">📥 Paket importieren</button>
                 <input type="file" id="importFile" style="display:none;" accept=".json" onchange="importJSON(event)">
@@ -188,7 +200,7 @@
 
         async function syncViaBluetooth() {
             if (!navigator.bluetooth) {
-                showToast('Bluetooth wird hier nicht unterstützt (Nutze QR-Code!)');
+                showToast('Bluetooth nicht unterstützt (Nutze QR-Code!)');
                 return;
             }
             try {
@@ -210,16 +222,66 @@
             }
         }
 
-        // --- UNIVERSAL QR-CODE SYNC (Funktioniert auf jedem iPad / Safari / Handy) ---
+        // --- LAN SUBNET AUTO-DISCOVERY (WLAN-SCANNER) ---
+        async function scanSubnetForPeers() {
+            const prefix = document.getElementById('subnetPrefix').value.trim();
+            if (!prefix) {
+                showToast('Bitte Subnetz-Präfix eingeben');
+                return;
+            }
+
+            showToast('Scanne WLAN nach Peers...');
+            let foundPeer = false;
+
+            // Beispielhafter Scan über IPs 1 bis 50 (oder man kann es erweitern)
+            const promises = [];
+            for (let i = 1; i < 50; i++) {
+                const ip = `${prefix}.${i}`;
+                // Testet z.B. einen lokalen Port oder Endpunkt (oder testt via Abfrage)
+                const p = fetch(`http://${ip}:1880/nexus-peer-check`, { mode: 'cors', signal: AbortSignal.timeout(300) })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data && data.status === 'nexus_active') {
+                            foundPeer = true;
+                            // Daten direkt mit diesem Peer abgleichen
+                            pushDataToPeer(`http://${ip}:1880/nexus-sync`);
+                        }
+                    })
+                    .catch(() => {});
+                promises.push(p);
+            }
+
+            await Promise.all(promises);
+
+            if (!foundPeer) {
+                showToast('Kein aktiver Peer im LAN gefunden');
+            }
+        }
+
+        async function pushDataToPeer(url) {
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ todos })
+                });
+                const remoteData = await res.json();
+                if (remoteData && remoteData.todos) {
+                    mergeTodos(remoteData.todos);
+                    showToast('LAN-Sync erfolgreich!');
+                }
+            } catch (e) {
+                showToast('Peer erreichbar, aber Sync fehlgeschlagen');
+            }
+        }
+
+        // --- UNIVERSAL QR-CODE SYNC ---
         function showQRCodeSync() {
             const container = document.getElementById('qrcodeContainer');
             container.innerHTML = '';
             container.style.display = 'flex';
 
-            // Komprimiere To-Dos als JSON-String
             const payload = JSON.stringify(todos);
-            
-            // Da QR-Codes eine Zeichenbegrenzung haben, generieren wir einen kompakten String oder nutzen den Standard-Export
             if (payload.length > 1500) {
                 showToast('Zu viele Aufgaben für QR-Code. Nutze Datei-Export!');
                 return;
@@ -233,10 +295,10 @@
                 colorLight: "#ffffff",
                 correctLevel: QRCode.CorrectLevel.L
             });
-            showToast('QR-Code generiert (Mit Kamera scannen)');
+            showToast('QR-Code generiert');
         }
 
-        // --- FILE EXPORT / IMPORT FALLBACK ---
+        // --- FILE EXPORT / IMPORT ---
         function exportJSON() {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(todos, null, 2));
             const downloadAnchor = document.createElement('a');
