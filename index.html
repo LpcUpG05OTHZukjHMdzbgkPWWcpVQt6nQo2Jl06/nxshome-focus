@@ -31,8 +31,8 @@
         h1 { font-size: 1.25rem; font-weight: 600; color: #53A9AE; letter-spacing: 0.5px; cursor: pointer; user-select: none; transition: opacity 0.2s; }
         h1:active { opacity: 0.6; }
         .header-actions { display: flex; gap: 8px; align-items: center; }
-        .notif-btn { background: #1E1E1E; border: 1px solid #2A2A2A; color: #888; font-size: 0.8rem; padding: 6px 10px; border-radius: 12px; cursor: pointer; transition: all 0.2s; }
-        .notif-btn.active { border-color: #53A9AE; color: #53A9AE; }
+        .btn-icon { background: #1E1E1E; border: 1px solid #2A2A2A; color: #888; font-size: 0.8rem; padding: 6px 10px; border-radius: 12px; cursor: pointer; transition: all 0.2s; }
+        .btn-icon.active { border-color: #53A9AE; color: #53A9AE; }
         .count-tag { background: #1E1E1E; color: #888; font-size: 0.8rem; padding: 4px 10px; border-radius: 12px; border: 1px solid #2A2A2A; }
         
         .input-card { background: #1E1E1E; border: 1px solid #2A2A2A; border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
@@ -43,6 +43,13 @@
         .input-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         button.add-btn { background: #53A9AE; border: none; border-radius: 10px; color: #121212; font-weight: bold; font-size: 0.95rem; padding: 10px 20px; cursor: pointer; flex: 1; }
         button.add-btn:active { opacity: 0.8; }
+
+        /* Direct P2P Sync Panel */
+        .sync-card { background: #1E1E1E; border: 1px solid #53A9AE; border-radius: 16px; padding: 14px; display: none; flex-direction: column; gap: 10px; animation: fadeIn 0.2s ease-in-out; }
+        .sync-title { font-size: 0.9rem; font-weight: bold; color: #53A9AE; display: flex; justify-content: space-between; align-items: center; }
+        .sync-actions { display: flex; flex-direction: column; gap: 8px; }
+        .sync-btn { background: #121212; border: 1px solid #2A2A2A; color: #FFF; border-radius: 10px; padding: 10px; font-size: 0.85rem; cursor: pointer; text-align: center; transition: all 0.2s; }
+        .sync-btn:hover { border-color: #53A9AE; }
 
         ul.todo-list { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
         li.todo-item { background: #1E1E1E; border: 1px solid #2A2A2A; border-radius: 14px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: flex-start; animation: fadeIn 0.2s ease-in-out; }
@@ -67,10 +74,25 @@
         <header>
             <h1 id="titleHeader" title="3x klicken für Test-Push">NEXUS // FOCUS</h1>
             <div class="header-actions">
-                <button class="notif-btn" id="notifBtn" onclick="toggleNotifications()">🔔 Push</button>
+                <button class="btn-icon" onclick="toggleSyncPanel()">📶 P2P</button>
+                <button class="btn-icon" id="notifBtn" onclick="toggleNotifications()">🔔 Push</button>
                 <span class="count-tag" id="count">0 Aufgaben</span>
             </div>
         </header>
+
+        <!-- P2P Sync Card -->
+        <div class="sync-card" id="syncPanel">
+            <div class="sync-title">
+                <span>DIREKTER P2P ABGLEICH</span>
+                <span style="cursor:pointer; color:#888;" onclick="toggleSyncPanel()">✕</span>
+            </div>
+            <div class="sync-actions">
+                <button class="sync-btn" onclick="syncViaBluetooth()">📡 Per Web Bluetooth koppeln</button>
+                <button class="sync-btn" onclick="exportJSON()">💾 Paket exportieren (.json)</button>
+                <button class="sync-btn" onclick="document.getElementById('importFile').click()">📥 Paket importieren</button>
+                <input type="file" id="importFile" style="display:none;" accept=".json" onchange="importJSON(event)">
+            </div>
+        </div>
 
         <div class="input-card">
             <input type="text" id="todoInput" placeholder="Neue Aufgabe..." autocomplete="off">
@@ -87,30 +109,20 @@
     <div id="toast" class="toast success">Erledigt</div>
 
     <script>
-        // Service Worker mit Hintergrund-Überprüfung & Test-Event-Listener
+        // --- SERVICE WORKER & PUSH NOTIFICATIONS ---
         if ('serviceWorker' in navigator) {
             const swCode = `
                 let checkInterval = null;
-
-                self.addEventListener('install', (e) => {
-                    self.skipWaiting();
-                });
-
-                self.addEventListener('activate', (e) => {
-                    e.waitUntil(clients.claim());
-                });
-
+                self.addEventListener('install', (e) => self.skipWaiting());
+                self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
                 self.addEventListener('message', (event) => {
                     if (event.data) {
-                        // Test-Push auslösen
                         if (event.data.type === 'TEST_PUSH') {
                             self.registration.showNotification('Nexus Focus // Test-Push 🎯', {
                                 body: 'Das System funktioniert einwandfrei!',
                                 icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23121212%22/><text y=%22.9em%22 font-size=%2290%22>🎯</text></svg>'
                             });
                         }
-                        
-                        // To-Do Deadline-Überprüfung
                         if (event.data.type === 'SYNC_TODOS') {
                             const todos = event.data.todos;
                             if (!checkInterval) {
@@ -133,11 +145,8 @@
                         }
                     }
                 });
-
-                self.addEventListener('fetch', function(e) {
-                    e.respondWith(fetch(e.request).catch(function() {
-                        return caches.match(e.request);
-                    }));
+                self.addEventListener('fetch', (e) => {
+                    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
                 });
             `;
             const swBlob = new Blob([swCode], { type: 'text/javascript' });
@@ -156,20 +165,98 @@
             toast.innerText = text;
             toast.classList.add('show');
             clearTimeout(toastTimeout);
-            toastTimeout = setTimeout(() => {
-                toast.classList.remove('show');
-            }, 1800);
+            toastTimeout = setTimeout(() => { toast.classList.remove('show'); }, 1800);
         }
 
-        async function toggleNotifications() {
-            if (!('Notification' in window)) {
-                showToast('Push wird nicht unterstützt');
+        function toggleSyncPanel() {
+            const panel = document.getElementById('syncPanel');
+            panel.style.display = (panel.style.display === 'flex') ? 'none' : 'flex';
+        }
+
+        // --- WEB BLUETOOTH SYNC (SERVERLOS & DIREKT) ---
+        const NEXUS_SERVICE_UUID = '12345678-1234-5678-1234-567812345678';
+        const NEXUS_CHAR_UUID    = '87654321-4321-6543-2187-654321876543';
+
+        async function syncViaBluetooth() {
+            if (!navigator.bluetooth) {
+                showToast('Bluetooth im Browser nicht unterstützt');
                 return;
             }
-            let permission = Notification.permission;
-            if (permission === 'default') {
-                permission = await Notification.requestPermission();
+
+            try {
+                showToast('Suche Bluetooth-Gerät...');
+                const device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: [NEXUS_SERVICE_UUID]
+                });
+
+                showToast('Verbinde mit ' + device.name + '...');
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(NEXUS_SERVICE_UUID);
+                const characteristic = await service.getCharacteristic(NEXUS_CHAR_UUID);
+
+                // Daten senden
+                const encoder = new TextEncoder();
+                const payload = JSON.stringify(todos);
+                await characteristic.writeValue(encoder.encode(payload));
+
+                showToast('Bluetooth-Sync erfolgreich!');
+                device.gatt.disconnect();
+            } catch (error) {
+                console.log('Bluetooth-Sync abgebrochen:', error);
+                showToast('Bluetooth-Abgleich beendet');
             }
+        }
+
+        // --- MANUELLER DIREKT-EXPORT / IMPORT (P2P FALLBACK) ---
+        function exportJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(todos, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "nexus_focus_backup.json");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast('Paket exportiert');
+        }
+
+        function importJSON(event) {
+            const fileReader = new FileReader();
+            fileReader.onload = function(e) {
+                try {
+                    const importedTodos = JSON.parse(e.target.result);
+                    if (Array.isArray(importedTodos)) {
+                        mergeTodos(importedTodos);
+                        showToast('Paket erfolgreich zusammengeführt!');
+                    }
+                } catch (err) {
+                    showToast('Fehler beim Lesen der Datei');
+                }
+            };
+            fileReader.readAsText(event.target.files[0]);
+        }
+
+        function mergeTodos(remoteTodos) {
+            let updated = false;
+            remoteTodos.forEach(remoteItem => {
+                const exists = todos.find(t => t.id === remoteItem.id);
+                if (!exists) {
+                    todos.push(remoteItem);
+                    updated = true;
+                }
+            });
+
+            if (updated) {
+                todos.sort((a, b) => b.id - a.id);
+                saveAndRender();
+            }
+        }
+
+        // --- CORE LOGIK & NOTIFICATIONS ---
+        async function toggleNotifications() {
+            if (!('Notification' in window)) return showToast('Push nicht unterstützt');
+            let permission = Notification.permission;
+            if (permission === 'default') permission = await Notification.requestPermission();
             if (permission === 'granted') {
                 showToast('Push-Benachrichtigungen aktiv');
                 updateNotifButtonState(true);
@@ -190,47 +277,30 @@
             }
         }
 
-        // Versteckter Test-Trigger (3 Klicks auf den Titel)
         let titleClickCount = 0;
         let titleClickTimer = null;
         document.getElementById('titleHeader').addEventListener('click', () => {
             titleClickCount++;
             clearTimeout(titleClickTimer);
-            
             if (titleClickCount === 3) {
                 titleClickCount = 0;
                 triggerTestPush();
             } else {
-                titleClickTimer = setTimeout(() => {
-                    titleClickCount = 0;
-                }, 600); // 600ms Zeitfenster für die 3 Klicks
+                titleClickTimer = setTimeout(() => { titleClickCount = 0; }, 600);
             }
         });
 
         function triggerTestPush() {
-            if (Notification.permission !== 'granted') {
-                showToast('Bitte erst Push aktivieren!');
-                toggleNotifications();
-                return;
-            }
-            
-            showToast('Test-Push wird gesendet...');
+            if (Notification.permission !== 'granted') return toggleNotifications();
+            showToast('Test-Push gesendet...');
             if (navigator.serviceWorker && navigator.serviceWorker.controller) {
                 navigator.serviceWorker.controller.postMessage({ type: 'TEST_PUSH' });
-            } else {
-                // Fallback direkt im Fenster falls SW noch lädt
-                new Notification('Nexus Focus // Test-Push 🎯', {
-                    body: 'Das System funktioniert einwandfrei!'
-                });
             }
         }
 
         function syncWithServiceWorker() {
             if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-                navigator.serviceWorker.controller.postMessage({
-                    type: 'SYNC_TODOS',
-                    todos: todos
-                });
+                navigator.serviceWorker.controller.postMessage({ type: 'SYNC_TODOS', todos: todos });
             }
         }
 
