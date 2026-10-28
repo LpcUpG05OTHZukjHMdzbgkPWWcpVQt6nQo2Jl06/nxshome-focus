@@ -54,9 +54,9 @@
         .sync-btn { background: #121212; border: 1px solid #2A2A2A; color: #FFF; border-radius: 10px; padding: 10px; font-size: 0.85rem; cursor: pointer; text-align: center; transition: all 0.2s; }
         .sync-btn:hover { border-color: #53A9AE; }
         
-        .subnet-box { display: flex; gap: 6px; margin-top: 4px; }
-        .subnet-box input { background: #121212; border: 1px solid #2A2A2A; border-radius: 8px; padding: 8px; color: #FFF; font-size: 0.85rem; width: 100%; outline: none; }
-        .subnet-box input:focus { border-color: #53A9AE; }
+        .node-red-box { display: flex; gap: 6px; margin-top: 4px; }
+        .node-red-box input { background: #121212; border: 1px solid #2A2A2A; border-radius: 8px; padding: 8px; color: #FFF; font-size: 0.85rem; width: 100%; outline: none; }
+        .node-red-box input:focus { border-color: #53A9AE; }
 
         #qrcodeContainer { display: flex; justify-content: center; background: #FFF; padding: 12px; border-radius: 10px; margin-top: 6px; }
 
@@ -89,7 +89,7 @@
             </div>
         </header>
 
-        <!-- Sync Panel mit LAN-Scanner & Fallbacks -->
+        <!-- Sync Panel mit Node-RED LAN-Sync & Fallbacks -->
         <div class="sync-card" id="syncPanel">
             <div class="sync-title">
                 <span>GERÄTE ABGLEICH</span>
@@ -98,11 +98,11 @@
             <div class="sync-actions">
                 <button class="sync-btn" onclick="syncViaBluetooth()">📡 Web Bluetooth (PC/Android)</button>
                 
-                <!-- LAN Subnet Auto-Discovery -->
+                <!-- Node-RED LAN Sync -->
                 <div style="display: flex; flex-direction: column; gap: 4px;">
-                    <div class="subnet-box">
-                        <input type="text" id="subnetPrefix" placeholder="z.B. 192.168.2" value="192.168.2">
-                        <button class="sync-btn" style="width: 130px; margin:0;" onclick="scanSubnetForPeers()">🔍 WLAN Scannen</button>
+                    <div class="node-red-box">
+                        <input type="text" id="nodeRedUrl" placeholder="z.B. http://192.168.2.49:1880/nexus-sync" value="http://192.168.2.49:1880/nexus-sync">
+                        <button class="sync-btn" style="width: 120px; margin:0;" onclick="syncViaNodeRed()">🔄 LAN Sync</button>
                     </div>
                 </div>
 
@@ -222,56 +222,30 @@
             }
         }
 
-        // --- LAN SUBNET AUTO-DISCOVERY (WLAN-SCANNER) ---
-        async function scanSubnetForPeers() {
-            const prefix = document.getElementById('subnetPrefix').value.trim();
-            if (!prefix) {
-                showToast('Bitte Subnetz-Präfix eingeben');
+        // --- NODE-RED LAN SYNC ---
+        async function syncViaNodeRed() {
+            const url = document.getElementById('nodeRedUrl').value.trim();
+            if (!url) {
+                showToast('Bitte Node-RED URL eingeben');
                 return;
             }
 
-            showToast('Scanne WLAN nach Peers...');
-            let foundPeer = false;
-
-            // Beispielhafter Scan über IPs 1 bis 50 (oder man kann es erweitern)
-            const promises = [];
-            for (let i = 1; i < 50; i++) {
-                const ip = `${prefix}.${i}`;
-                // Testet z.B. einen lokalen Port oder Endpunkt (oder testt via Abfrage)
-                const p = fetch(`http://${ip}:1880/nexus-peer-check`, { mode: 'cors', signal: AbortSignal.timeout(300) })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data && data.status === 'nexus_active') {
-                            foundPeer = true;
-                            // Daten direkt mit diesem Peer abgleichen
-                            pushDataToPeer(`http://${ip}:1880/nexus-sync`);
-                        }
-                    })
-                    .catch(() => {});
-                promises.push(p);
-            }
-
-            await Promise.all(promises);
-
-            if (!foundPeer) {
-                showToast('Kein aktiver Peer im LAN gefunden');
-            }
-        }
-
-        async function pushDataToPeer(url) {
+            showToast('Synchronisiere mit Heimnetz...');
             try {
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ todos })
                 });
-                const remoteData = await res.json();
-                if (remoteData && remoteData.todos) {
-                    mergeTodos(remoteData.todos);
+                const data = await res.json();
+                if (data && data.todos) {
+                    mergeTodos(data.todos);
                     showToast('LAN-Sync erfolgreich!');
+                } else {
+                    showToast('Ungültige Antwort vom Server');
                 }
             } catch (e) {
-                showToast('Peer erreichbar, aber Sync fehlgeschlagen');
+                showToast('Verbindung zu Node-RED fehlgeschlagen');
             }
         }
 
@@ -333,9 +307,11 @@
                 if (!exists) {
                     todos.push(remoteItem);
                     updated = true;
+                } else {
+                    Object.assign(exists, remoteItem);
                 }
             });
-            if (updated) {
+            if (updated || remoteTodos.length > 0) {
                 todos.sort((a, b) => b.id - a.id);
                 saveAndRender();
             }
