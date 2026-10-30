@@ -1,533 +1,475 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Nexus Focus</title>
-    
-    <link rel="manifest" href='data:application/manifest+json,{
-        "name": "Nexus Focus",
-        "short_name": "Focus",
-        "start_url": ".",
-        "display": "standalone",
-        "background_color": "#121212",
-        "theme_color": "#121212",
-        "icons": [{
-            "src": "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23121212%22/><text y=%22.9em%22 font-size=%2290%22>🎯</text></svg>",
-            "sizes": "512x512",
-            "type": "image/svg+xml"
-        }]
-    }'>
-
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#121212">
-    
-    <!-- QRCode.js für universellen Fallback -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Coin Scanner - KI Münzerkennung</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        nexus: {
+                            50: '#f0fdfd',
+                            100: '#ccfbf1',
+                            400: '#2dd4bf',
+                            500: '#53A9AE',
+                            600: '#3d868a',
+                            800: '#13282a',
+                            900: '#0c1a1c',
+                            950: '#060d0e',
+                        }
+                    },
+                    boxShadow: {
+                        'glow': '0 0 20px -3px rgba(83, 169, 174, 0.4)',
+                        'glow-lg': '0 0 35px -5px rgba(83, 169, 174, 0.6)',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome für Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tesseract.js OCR CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { background-color: #121212; color: #E0E0E0; min-height: 100vh; padding: 24px 16px; display: flex; flex-direction: column; align-items: center; }
-        .container { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 16px; }
-        header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 1px solid #2A2A2A; }
-        h1 { font-size: 1.25rem; font-weight: 600; color: #53A9AE; letter-spacing: 0.5px; cursor: pointer; user-select: none; transition: opacity 0.2s; }
-        h1:active { opacity: 0.6; }
-        .header-actions { display: flex; gap: 8px; align-items: center; }
-        .btn-icon { background: #1E1E1E; border: 1px solid #2A2A2A; color: #888; font-size: 0.8rem; padding: 6px 10px; border-radius: 12px; cursor: pointer; transition: all 0.2s; }
-        .btn-icon.active { border-color: #53A9AE; color: #53A9AE; }
-        .count-tag { background: #1E1E1E; color: #888; font-size: 0.8rem; padding: 4px 10px; border-radius: 12px; border: 1px solid #2A2A2A; }
-        
-        .input-card { background: #1E1E1E; border: 1px solid #2A2A2A; border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
-        input[type="text"], input[type="datetime-local"] { width: 100%; background: #121212; border: 1px solid #2A2A2A; border-radius: 10px; padding: 12px; color: #FFF; font-size: 0.95rem; outline: none; transition: border-color 0.2s; }
-        input[type="text"]:focus, input[type="datetime-local"]:focus { border-color: #53A9AE; }
-        input[type="datetime-local"] { color-scheme: dark; font-family: inherit; }
-        
-        .input-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-        button.add-btn { background: #53A9AE; border: none; border-radius: 10px; color: #121212; font-weight: bold; font-size: 0.95rem; padding: 10px 20px; cursor: pointer; flex: 1; }
-        button.add-btn:active { opacity: 0.8; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #060d0e;
+            color: #e2e8f0;
+        }
 
-        /* Sync Panel */
-        .sync-card { background: #1E1E1E; border: 1px solid #53A9AE; border-radius: 16px; padding: 14px; display: none; flex-direction: column; gap: 10px; animation: fadeIn 0.2s ease-in-out; }
-        .sync-title { font-size: 0.9rem; font-weight: bold; color: #53A9AE; display: flex; justify-content: space-between; align-items: center; }
-        .sync-actions { display: flex; flex-direction: column; gap: 8px; }
-        .sync-btn { background: #121212; border: 1px solid #2A2A2A; color: #FFF; border-radius: 10px; padding: 10px; font-size: 0.85rem; cursor: pointer; text-align: center; transition: all 0.2s; }
-        .sync-btn:hover { border-color: #53A9AE; }
-        
-        .node-red-box { display: flex; gap: 6px; margin-top: 4px; }
-        .node-red-box input { background: #121212; border: 1px solid #2A2A2A; border-radius: 8px; padding: 8px; color: #FFF; font-size: 0.85rem; width: 100%; outline: none; }
-        .node-red-box input:focus { border-color: #53A9AE; }
+        /* Pulse Animations & Scanner Overlay */
+        .scan-line {
+            position: absolute;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #53A9AE, transparent);
+            box-shadow: 0 0 15px #53A9AE;
+            animation: scan 2.5s infinite ease-in-out;
+        }
 
-        #qrcodeContainer { display: flex; justify-content: center; background: #FFF; padding: 12px; border-radius: 10px; margin-top: 6px; }
+        @keyframes scan {
+            0% { top: 5%; opacity: 0.2; }
+            50% { top: 90%; opacity: 1; }
+            100% { top: 5%; opacity: 0.2; }
+        }
 
-        ul.todo-list { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
-        li.todo-item { background: #1E1E1E; border: 1px solid #2A2A2A; border-radius: 14px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: flex-start; animation: fadeIn 0.2s ease-in-out; }
-        .todo-content { display: flex; flex-direction: column; gap: 4px; flex: 1; padding-right: 12px; }
-        .todo-text { font-size: 0.95rem; word-break: break-word; line-height: 1.4; }
-        .todo-due { font-size: 0.75rem; color: #888; display: flex; align-items: center; gap: 4px; }
-        .todo-due.overdue { color: #E57373; }
-        
-        .check-btn { background: transparent; border: 2px solid #53A9AE; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.2s; margin-top: 2px; }
-        .check-btn:active { background: #53A9AE; }
-        .empty-state { text-align: center; color: #555; font-size: 0.9rem; margin-top: 40px; font-style: italic; }
-        
-        .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px); background: #1E1E1E; border: 1px solid #2A2A2A; color: #E0E0E0; padding: 10px 18px; border-radius: 20px; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(0,0,0,0.5); opacity: 0; transition: transform 0.3s ease, opacity 0.3s ease; pointer-events: none; z-index: 1000; }
-        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-        .toast.success { border-color: #53A9AE; color: #53A9AE; }
+        /* Target Reticle Custom Styles */
+        .reticle-corner {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-color: #53A9AE;
+            border-style: solid;
+        }
 
-        /* Secret Debug Modal (Blurred Background) */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); display: none; justify-content: center; align-items: center; z-index: 2000; padding: 16px; animation: fadeIn 0.25s ease-out; }
-        .modal-card { background: #181818; border: 1px solid #53A9AE; border-radius: 20px; width: 100%; max-width: 440px; padding: 20px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2A2A2A; padding-bottom: 10px; }
-        .modal-title { color: #53A9AE; font-size: 1rem; font-weight: bold; letter-spacing: 0.5px; }
-        .debug-console { background: #0A0A0A; border: 1px solid #2A2A2A; border-radius: 10px; padding: 12px; font-family: monospace; font-size: 0.78rem; color: #A0A0A0; height: 180px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
-        .log-success { color: #53A9AE; }
-        .log-error { color: #E57373; }
-        .log-info { color: #888; }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        /* Glassmorphism Panels */
+        .glass-panel {
+            background: rgba(19, 40, 42, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(83, 169, 174, 0.2);
+        }
     </style>
 </head>
-<body>
-    <div class="container">
-        <header>
-            <h1 id="titleHeader" title="3x Klick: Test-Push | 5x Klick: Debug Console">NEXUS // FOCUS</h1>
-            <div class="header-actions">
-                <button class="btn-icon" onclick="toggleSyncPanel()">📶 Sync</button>
-                <button class="btn-icon" id="notifBtn" onclick="toggleNotifications()">🔔 Push</button>
-                <span class="count-tag" id="count">0 Aufgaben</span>
-            </div>
-        </header>
+<body class="min-h-screen flex flex-col justify-between selection:bg-nexus-500 selection:text-black">
 
-        <!-- Sync Panel -->
-        <div class="sync-card" id="syncPanel">
-            <div class="sync-title">
-                <span>GERÄTE ABGLEICH</span>
-                <span style="cursor:pointer; color:#888;" onclick="toggleSyncPanel()">✕</span>
-            </div>
-            <div class="sync-actions">
-                <button class="sync-btn" onclick="syncViaBluetooth()">📡 Web Bluetooth (PC/Android)</button>
-                
-                <!-- Node-RED LAN Sync -->
-                <div style="display: flex; flex-direction: column; gap: 4px;">
-                    <div class="node-red-box">
-                        <input type="text" id="nodeRedUrl" value="http://192.168.2.49:1880/endpoint/nexus-sync">
-                        <button class="sync-btn" style="width: 120px; margin:0;" onclick="syncViaNodeRed()">🔄 LAN Sync</button>
-                    </div>
+    <!-- Header / Navigation -->
+    <header class="w-full glass-panel sticky top-0 z-50 border-b border-nexus-500/20 px-4 py-3">
+        <div class="max-w-4xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-nexus-500/10 border border-nexus-500/40 flex items-center justify-center text-nexus-500 shadow-glow">
+                    <i class="fa-solid font-bold fa-coins text-xl"></i>
                 </div>
-
-                <button class="sync-btn" onclick="showQRCodeSync()">📷 Per QR-Code übertragen</button>
-                <button class="sync-btn" onclick="exportJSON()">💾 Datei-Backup (.json)</button>
-                <button class="sync-btn" onclick="document.getElementById('importFile').click()">📥 Paket importieren</button>
-                <input type="file" id="importFile" style="display:none;" accept=".json" onchange="importJSON(event)">
+                <div>
+                    <h1 class="text-lg font-bold tracking-wider text-white flex items-center gap-2">
+                        NEXUS <span class="text-nexus-500 text-xs px-2 py-0.5 rounded-full bg-nexus-500/10 border border-nexus-500/30">COIN OCR</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Client-seitige Live-Münzerkennung</p>
+                </div>
             </div>
-            <div id="qrcodeContainer" style="display:none;"></div>
-        </div>
-
-        <div class="input-card">
-            <input type="text" id="todoInput" placeholder="Neue Aufgabe..." autocomplete="off">
-            <div class="input-row">
-                <input type="datetime-local" id="dueDateInput">
-                <button class="add-btn" onclick="addTodo()">Hinzufügen</button>
+            <div id="statusBadge" class="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/80 border border-slate-800 text-xs text-slate-300">
+                <span id="statusIndicator" class="w-2 h-2 rounded-full bg-slate-500"></span>
+                <span id="statusBadgeText">Kamera inaktiv</span>
             </div>
         </div>
+    </header>
 
-        <ul class="todo-list" id="todoList"></ul>
-        <div class="empty-state" id="emptyState" style="display: none;">Alles erledigt. Standby.</div>
+    <!-- Main Content Container -->
+    <main class="flex-grow max-w-4xl w-full mx-auto p-4 sm:p-6 flex flex-col items-center justify-center gap-6">
+
+        <!-- Informatives Banner bei Start -->
+        <div id="introCard" class="w-full glass-panel rounded-2xl p-6 text-center space-y-3 transition-all duration-300">
+            <div class="w-14 h-14 mx-auto rounded-full bg-nexus-500/10 border border-nexus-500/30 flex items-center justify-center text-nexus-500 text-2xl">
+                <i class="fa-solid fa-camera-rotate"></i>
+            </div>
+            <h2 class="text-xl font-semibold text-white">Münzwert schnell & unkompliziert scannen</h2>
+            <p class="text-sm text-slate-300 max-w-lg mx-auto">
+                Richte die Kamera direkt auf die Zahlenseite der Münze. Das Bild wird absolut privat 
+                <span class="text-nexus-500 font-medium">ausschließlich lokal in deinem Browser</span> verarbeitet und niemals gespeichert.
+            </p>
+        </div>
+
+        <!-- Camera / Preview Container -->
+        <div class="w-full relative max-w-lg aspect-square sm:aspect-[4/3] rounded-3xl overflow-hidden glass-panel border border-nexus-500/30 shadow-glow flex items-center justify-center bg-nexus-950">
+            
+            <!-- Default Placeholder when camera is inactive -->
+            <div id="cameraPlaceholder" class="flex flex-col items-center gap-3 text-slate-500 p-6 text-center">
+                <i class="fa-solid fa-eye-slash text-5xl text-nexus-500/40"></i>
+                <p class="text-sm">Kamera ist derzeit ausgeschaltet</p>
+            </div>
+
+            <!-- Video Live Stream -->
+            <video id="videoElement" autoplay playsinline class="hidden w-full h-full object-cover"></video>
+
+            <!-- Snapshot Canvas Overlay for result preview -->
+            <canvas id="snapshotCanvas" class="hidden w-full h-full object-cover"></canvas>
+
+            <!-- Scanning Overlay Frame (Visual Guidance) -->
+            <div id="scannerOverlay" class="hidden absolute inset-0 pointer-events-none flex items-center justify-center">
+                <div class="scan-line"></div>
+                <!-- Circle Guide for Coin -->
+                <div class="w-56 h-56 sm:w-64 sm:h-64 rounded-full border-2 border-dashed border-nexus-500/60 flex items-center justify-center shadow-[0_0_50px_rgba(83,169,174,0.15)] animate-pulse">
+                    <span class="text-xs text-nexus-500/70 uppercase tracking-widest font-mono">Münze hier zentrieren</span>
+                </div>
+                <!-- HUD Corner Accents -->
+                <div class="reticle-corner top-4 left-4 border-t-2 border-l-2 rounded-tl-lg"></div>
+                <div class="reticle-corner top-4 right-4 border-t-2 border-r-2 rounded-tr-lg"></div>
+                <div class="reticle-corner bottom-4 left-4 border-b-2 border-l-2 rounded-bl-lg"></div>
+                <div class="reticle-corner bottom-4 right-4 border-b-2 border-r-2 rounded-br-lg"></div>
+            </div>
+
+            <!-- Loading Spinner & Progress Overlay -->
+            <div id="loadingOverlay" class="hidden absolute inset-0 bg-nexus-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center space-y-4">
+                <div class="relative w-16 h-16">
+                    <div class="absolute inset-0 rounded-full border-4 border-nexus-500/20"></div>
+                    <div class="absolute inset-0 rounded-full border-4 border-nexus-500 border-t-transparent animate-spin"></div>
+                </div>
+                <div>
+                    <h3 id="loadingText" class="text-lg font-semibold text-white">Analysiere Münze...</h3>
+                    <p id="loadingDetail" class="text-xs text-nexus-400 font-mono mt-1">Tesseract OCR Engine startet...</p>
+                </div>
+                <!-- Progress Bar -->
+                <div class="w-48 bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                    <div id="progressBar" class="bg-nexus-500 h-full w-0 transition-all duration-200"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons Bar -->
+        <div class="w-full max-w-lg flex flex-col gap-3">
+            <!-- Initial Start Camera Button -->
+            <button id="startCamBtn" onclick="initCamera()" class="w-full py-4 px-6 rounded-2xl bg-nexus-500 hover:bg-nexus-600 text-nexus-950 font-bold text-lg flex items-center justify-center gap-3 transition-all transform active:scale-95 shadow-glow hover:shadow-glow-lg">
+                <i class="fa-solid fa-camera"></i>
+                <span>Kamera starten</span>
+            </button>
+
+            <!-- Capture Image Button (hidden initially) -->
+            <button id="captureBtn" onclick="captureAndAnalyze()" class="hidden w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-nexus-500 to-teal-400 hover:from-nexus-600 hover:to-teal-500 text-nexus-950 font-bold text-lg flex items-center justify-center gap-3 transition-all transform active:scale-95 shadow-glow">
+                <i class="fa-solid fa-circle-dot text-xl animate-ping"></i>
+                <span>Foto aufnehmen & Wert erkennen</span>
+            </button>
+
+            <!-- Reset / Rescan Button (hidden initially) -->
+            <button id="rescanBtn" onclick="resetToLiveCamera()" class="hidden w-full py-3 px-6 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-medium text-base flex items-center justify-center gap-2 border border-slate-700 transition-all">
+                <i class="fa-solid fa-rotate-left"></i>
+                <span>Erneut scannen</span>
+            </button>
+        </div>
+
+        <!-- Result Box Section -->
+        <div id="resultCard" class="hidden w-full max-w-lg glass-panel rounded-2xl p-6 transition-all duration-300">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+                <h3 class="text-sm uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-2">
+                    <i class="fa-solid fa-microchip text-nexus-500"></i> Erkennungsergebnis
+                </h3>
+                <span id="confidenceBadge" class="text-xs px-2.5 py-1 rounded-full bg-nexus-500/10 text-nexus-400 border border-nexus-500/20 font-mono">
+                    Konfidenz: --%
+                </span>
+            </div>
+
+            <!-- Primary Result Display -->
+            <div id="primaryResultContainer" class="text-center py-4 bg-nexus-950/50 rounded-xl border border-nexus-500/20 mb-4">
+                <span class="text-xs text-slate-400 block mb-1">Ermittelter Wert</span>
+                <div id="detectedValue" class="text-4xl font-extrabold text-nexus-400 tracking-tight">--</div>
+            </div>
+
+            <!-- Raw Extracted OCR Text Details -->
+            <div class="space-y-2 text-xs">
+                <div class="flex justify-between text-slate-400">
+                    <span>Erkannter Text (Rohdaten):</span>
+                    <span id="rawText" class="font-mono text-slate-200 font-medium truncate max-w-[200px]">Keine Daten</span>
+                </div>
+            </div>
+
+            <!-- Fallback Manual Selection Menu (Shown if OCR is uncertain) -->
+            <div id="fallbackMenu" class="hidden mt-4 pt-4 border-t border-slate-800">
+                <p class="text-xs text-amber-400 mb-2 flex items-center gap-1.5">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Ist das Ergebnis unscharf? Wähle den Wert manuell:
+                </p>
+                <div class="grid grid-cols-4 gap-2 text-xs font-semibold">
+                    <button onclick="selectManualValue('2 Euro')" class="p-2 rounded-lg bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-slate-200 transition">2 €</button>
+                    <button onclick="selectManualValue('1 Euro')" class="p-2 rounded-lg bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-slate-200 transition">1 €</button>
+                    <button onclick="selectManualValue('50 Cent')" class="p-2 rounded-lg bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-slate-200 transition">50 Ct</button>
+                    <button onclick="selectManualValue('20 Cent')" class="p-2 rounded-lg bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-slate-200 transition">20 Ct</button>
+                    <button onclick="selectManualValue('10 Cent')" class="p-2 rounded-lg bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-slate-200 transition">10 Ct</button>
+                    <button onclick="selectManualValue('5 Cent')" class="p-2 rounded-lg bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-slate-200 transition">5 Ct</button>
+                    <button onclick="selectManualValue('2 Cent')" class="p-2 rounded-lg bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-slate-200 transition">2 Ct</button>
+                    <button onclick="selectManualValue('1 Cent')" class="p-2 rounded-lg bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-slate-200 transition">1 Ct</button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full text-center py-4 text-xs text-slate-500 border-t border-slate-900">
+        <p>Nexus Coin Scanner &bull; 100% On-Device OCR Analysis &bull; Keine Datenübertragung</p>
+    </footer>
+
+    <!-- Notification Toast Element -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-800 border border-slate-700 text-slate-200 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-sm">
+        <i id="toastIcon" class="fa-solid fa-circle-info text-nexus-500"></i>
+        <span id="toastMsg">Hinweis</span>
     </div>
-    
-    <div id="toast" class="toast success">Erledigt</div>
 
-    <!-- Secret Debug Modal Overlay -->
-    <div class="modal-overlay" id="debugModal">
-        <div class="modal-card">
-            <div class="modal-header">
-                <span class="modal-title">🛠️ NODE-RED DIAGNOSTICS</span>
-                <span style="cursor:pointer; color:#888; font-weight:bold;" onclick="closeDebugModal()">✕</span>
-            </div>
-            <div style="font-size:0.8rem; color:#888;">Führt eine direkte Test-Anfrage an den konfigurierten Node-RED Endpunkt aus:</div>
-            <div class="debug-console" id="debugConsole">System bereit. Warte auf Testlauf...</div>
-            <div style="display:flex; gap:8px;">
-                <button class="add-btn" style="background:#53A9AE; color:#121212;" onclick="runNodeRedDiagnose()">Test ausführen</button>
-                <button class="add-btn" style="background:#2A2A2A; color:#FFF;" onclick="closeDebugModal()">Schließen</button>
-            </div>
-        </div>
-    </div>
-
+    <!-- Application JavaScript Logic -->
     <script>
-        // --- SERVICE WORKER & PUSH NOTIFICATIONS ---
-        if ('serviceWorker' in navigator) {
-            const swCode = `
-                let checkInterval = null;
-                self.addEventListener('install', (e) => self.skipWaiting());
-                self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
-                self.addEventListener('message', (event) => {
-                    if (event.data) {
-                        if (event.data.type === 'TEST_PUSH') {
-                            self.registration.showNotification('Nexus Focus // Test-Push 🎯', {
-                                body: 'Das System funktioniert einwandfrei!',
-                                icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23121212%22/><text y=%22.9em%22 font-size=%2290%22>🎯</text></svg>'
-                            });
-                        }
-                        if (event.data.type === 'SYNC_TODOS') {
-                            const todos = event.data.todos;
-                            if (!checkInterval) {
-                                checkInterval = setInterval(() => {
-                                    const now = new Date().getTime();
-                                    todos.forEach(todo => {
-                                        if (todo.due && !todo.notified && !todo.completed) {
-                                            const dueTime = new Date(todo.due).getTime();
-                                            if (now >= dueTime) {
-                                                self.registration.showNotification('Nexus Focus // Fällig!', {
-                                                    body: 'Aufgabe: ' + todo.text,
-                                                    icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23121212%22/><text y=%22.9em%22 font-size=%2290%22>🎯</text></svg>'
-                                                });
-                                                todo.notified = true;
-                                            }
-                                        }
-                                    });
-                                }, 30000);
+        // Global State Variables
+        let videoStream = null;
+        const video = document.getElementById('videoElement');
+        const snapshotCanvas = document.getElementById('snapshotCanvas');
+        const startCamBtn = document.getElementById('startCamBtn');
+        const captureBtn = document.getElementById('captureBtn');
+        const rescanBtn = document.getElementById('rescanBtn');
+        const cameraPlaceholder = document.getElementById('cameraPlaceholder');
+        const scannerOverlay = document.getElementById('scannerOverlay');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const resultCard = document.getElementById('resultCard');
+        const introCard = document.getElementById('introCard');
+
+        // Status Indicator Updates
+        function updateStatus(text, active = false) {
+            document.getElementById('statusBadgeText').innerText = text;
+            const ind = document.getElementById('statusIndicator');
+            if(active) {
+                ind.className = "w-2 h-2 rounded-full bg-nexus-400 animate-pulse";
+            } else {
+                ind.className = "w-2 h-2 rounded-full bg-slate-500";
+            }
+        }
+
+        // Toast Notification System
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMsg.innerText = message;
+            if(type === 'error') {
+                toastIcon.className = "fa-solid fa-circle-exclamation text-rose-500";
+            } else if(type === 'success') {
+                toastIcon.className = "fa-solid fa-circle-check text-emerald-400";
+            } else {
+                toastIcon.className = "fa-solid fa-circle-info text-nexus-500";
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3500);
+        }
+
+        // 1. Initialize Camera Function
+        async function initCamera() {
+            try {
+                // Constraints optimization for back-camera on mobile devices
+                const constraints = {
+                    video: {
+                        facingMode: { ideal: 'environment' },
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                };
+
+                videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = videoStream;
+
+                // Toggle visibility elements
+                cameraPlaceholder.classList.add('hidden');
+                video.classList.remove('hidden');
+                scannerOverlay.classList.remove('hidden');
+                startCamBtn.classList.add('hidden');
+                captureBtn.classList.remove('hidden');
+                introCard.classList.add('hidden');
+
+                updateStatus("Kamera aktiv", true);
+                showToast("Kamera erfolgreich gestartet", "success");
+
+            } catch (error) {
+                console.error("Kamerafehler:", error);
+                showToast("Zugriff auf Kamera fehlgeschlagen. Bitte Berechtigungen prüfen.", "error");
+                updateStatus("Kamera-Fehler");
+            }
+        }
+
+        // 2. Capture Frame & Analyze OCR
+        async function captureAndAnalyze() {
+            if (!videoStream) return;
+
+            // Prepare Canvas Snapshot
+            const context = snapshotCanvas.getContext('2d');
+            snapshotCanvas.width = video.videoWidth || 640;
+            snapshotCanvas.height = video.videoHeight || 480;
+
+            // Draw current frame into hidden canvas
+            context.drawImage(video, 0, 0, snapshotCanvas.width, snapshotCanvas.height);
+
+            // Pre-process canvas for better OCR contrast (Grayscale + High Contrast)
+            preprocessCanvas(context, snapshotCanvas.width, snapshotCanvas.height);
+
+            // Hide Video & Overlay, show static Snapshot Preview
+            video.classList.add('hidden');
+            scannerOverlay.classList.add('hidden');
+            snapshotCanvas.classList.remove('hidden');
+
+            // Toggle Buttons
+            captureBtn.classList.add('hidden');
+            rescanBtn.classList.remove('hidden');
+
+            // Show Loading Overlay
+            loadingOverlay.classList.remove('hidden');
+            updateLoadingProgress("Münze vorbereiten...", 10);
+
+            try {
+                // Perform OCR with Tesseract.js
+                const result = await Tesseract.recognize(
+                    snapshotCanvas,
+                    'eng', // English language is usually best for digits & latin symbols
+                    {
+                        logger: m => {
+                            if (m.status === 'recognizing text') {
+                                const prog = Math.round(m.progress * 100);
+                                updateLoadingProgress(`Text wird erkannt: ${prog}%`, prog);
+                            } else if(m.status === 'loading tesseract core') {
+                                updateLoadingProgress("Lade OCR-Core...", 25);
+                            } else if(m.status === 'initializing tesseract') {
+                                updateLoadingProgress("Initialisiere Engine...", 45);
                             }
                         }
                     }
-                });
-                self.addEventListener('fetch', (e) => {
-                    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
-                });
-            `;
-            const swBlob = new Blob([swCode], { type: 'text/javascript' });
-            const swUrl = URL.createObjectURL(swBlob);
-            navigator.serviceWorker.register(swUrl).then(reg => {
-                window.swRegistration = reg;
-                syncWithServiceWorker();
-            }).catch(() => {});
-        }
+                );
 
-        let todos = JSON.parse(localStorage.getItem('nexus_todos') || '[]');
-        let toastTimeout;
+                // Process Results
+                processOcrResults(result.data);
 
-        function showToast(text) {
-            const toast = document.getElementById('toast');
-            toast.innerText = text;
-            toast.classList.add('show');
-            clearTimeout(toastTimeout);
-            toastTimeout = setTimeout(() => { toast.classList.remove('show'); }, 1800);
-        }
-
-        function toggleSyncPanel() {
-            const panel = document.getElementById('syncPanel');
-            panel.style.display = (panel.style.display === 'flex') ? 'none' : 'flex';
-            document.getElementById('qrcodeContainer').style.display = 'none';
-        }
-
-        // --- WEB BLUETOOTH SYNC ---
-        const NEXUS_SERVICE_UUID = '12345678-1234-5678-1234-567812345678';
-        const NEXUS_CHAR_UUID    = '87654321-4321-6543-2187-654321876543';
-
-        async function syncViaBluetooth() {
-            if (!navigator.bluetooth) {
-                showToast('Bluetooth nicht unterstützt (Nutze QR-Code!)');
-                return;
-            }
-            try {
-                showToast('Suche Bluetooth-Gerät...');
-                const device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: [NEXUS_SERVICE_UUID]
-                });
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService(NEXUS_SERVICE_UUID);
-                const characteristic = await service.getCharacteristic(NEXUS_CHAR_UUID);
-
-                const encoder = new TextEncoder();
-                await characteristic.writeValue(encoder.encode(JSON.stringify(todos)));
-                showToast('Bluetooth-Sync erfolgreich!');
-                device.gatt.disconnect();
-            } catch (error) {
-                showToast('Bluetooth-Abgleich abgebrochen');
+            } catch (ocrError) {
+                console.error("OCR Fehler:", ocrError);
+                showToast("Fehler bei der Texterkennung", "error");
+                displayFallbackResult("Unbekannt", 0, "Erkennungsfehler");
+            } finally {
+                loadingOverlay.classList.add('hidden');
             }
         }
 
-        // --- NODE-RED LAN SYNC ---
-        async function syncViaNodeRed() {
-            const url = document.getElementById('nodeRedUrl').value.trim();
-            if (!url) {
-                showToast('Bitte Node-RED URL eingeben');
-                return;
-            }
-
-            showToast('Synchronisiere mit Heimnetz...');
-            try {
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ todos })
-                });
-                const data = await res.json();
-                if (data && data.todos) {
-                    mergeTodos(data.todos);
-                    showToast('LAN-Sync erfolgreich!');
-                } else {
-                    showToast('Ungültige Antwort vom Server');
-                }
-            } catch (e) {
-                showToast('Verbindung zu Node-RED fehlgeschlagen');
-            }
-        }
-
-        // --- SECRET DEBUG MODAL LOGIK (5x KLICK) ---
-        let titleClickCount = 0;
-        let titleClickTimer = null;
-        document.getElementById('titleHeader').addEventListener('click', () => {
-            titleClickCount++;
-            clearTimeout(titleClickTimer);
-            
-            if (titleClickCount === 3) {
-                triggerTestPush();
-            } else if (titleClickCount === 5) {
-                titleClickCount = 0;
-                openDebugModal();
-                return;
-            }
-            
-            titleClickTimer = setTimeout(() => { titleClickCount = 0; }, 700);
-        });
-
-        function openDebugModal() {
-            document.getElementById('debugModal').style.display = 'flex';
-            runNodeRedDiagnose();
-        }
-
-        function closeDebugModal() {
-            document.getElementById('debugModal').style.display = 'none';
-        }
-
-        async function runNodeRedDiagnose() {
-            const consoleBox = document.getElementById('debugConsole');
-            const url = document.getElementById('nodeRedUrl').value.trim();
-            
-            consoleBox.innerHTML = `<span class="log-info">[INIT] Starte Verbindungstest...</span>\nTarget: ${url}\n`;
-            
-            const startTime = performance.now();
-            try {
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ todos, debug: true }),
-                    signal: AbortSignal.timeout(4000)
-                });
+        // Image Preprocessing: Grayscale & Contrast boost for coins
+        function preprocessCanvas(ctx, width, height) {
+            const imgData = ctx.getImageData(0, 0, width, height);
+            const d = imgData.data;
+            for (let i = 0; i < d.length; i += 4) {
+                // Calculate grayscale value
+                const avg = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+                // Apply subtle contrast adjustment
+                const contrastFactor = 1.3;
+                const value = Math.min(255, Math.max(0, (avg - 128) * contrastFactor + 128));
                 
-                const duration = Math.round(performance.now() - startTime);
-                
-                if (res.ok) {
-                    const data = await res.json();
-                    consoleBox.innerHTML += `<span class="log-success">[SUCCESS] Status: ${res.status} OK (${duration}ms)</span>\n`;
-                    consoleBox.innerHTML += `<span class="log-info">Empfangene Tasks: ${data.todos ? data.todos.length : 0}</span>\n`;
-                    consoleBox.innerHTML += `Response Payload:\n${JSON.stringify(data, null, 2)}`;
-                } else {
-                    consoleBox.innerHTML += `<span class="log-error">[HTTP ERROR] Status: ${res.status} ${res.statusText}</span>\n`;
-                    consoleBox.innerHTML += `Der Node-RED Endpunkt hat mit einem Fehler reagiert.`;
-                }
-            } catch (e) {
-                consoleBox.innerHTML += `<span class="log-error">[NETWORK ERROR] ${e.name}: ${e.message}</span>\n\n`;
-                if (e.name === 'TimeoutError') {
-                    consoleBox.innerHTML += `<span class="log-info">Ursache: Zeitüberschreitung. Prüfe, ob die IP (192.168.2.49) im selben WLAN erreichbar ist.</span>`;
-                } else if (window.location.protocol === 'https:' && url.startsWith('http:')) {
-                    consoleBox.innerHTML += `<span class="log-info">Ursache: HTTPS Mixed-Content Blockade! Der Browser sperrt Anfragen von HTTPS (Cloudflare) auf HTTP (LAN IP).</span>`;
-                } else {
-                    consoleBox.innerHTML += `<span class="log-info">Ursache: Node-RED offline, CORS gefiltert oder IP falsch.</span>`;
-                }
+                d[i] = value;     // R
+                d[i + 1] = value; // G
+                d[i + 2] = value; // B
             }
+            ctx.putImageData(imgData, 0, 0);
         }
 
-        // --- UNIVERSAL QR-CODE SYNC ---
-        function showQRCodeSync() {
-            const container = document.getElementById('qrcodeContainer');
-            container.innerHTML = '';
-            container.style.display = 'flex';
-
-            const payload = JSON.stringify(todos);
-            if (payload.length > 1500) {
-                showToast('Zu viele Aufgaben für QR-Code. Nutze Datei-Export!');
-                return;
-            }
-
-            new QRCode(container, {
-                text: payload,
-                width: 200,
-                height: 200,
-                colorDark: "#121212",
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.L
-            });
-            showToast('QR-Code generiert');
+        // Helper: Loading UI Update
+        function updateLoadingProgress(text, percent) {
+            document.getElementById('loadingDetail').innerText = text;
+            document.getElementById('progressBar').style.width = `${percent}%`;
         }
 
-        // --- FILE EXPORT / IMPORT ---
-        function exportJSON() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(todos, null, 2));
-            const downloadAnchor = document.createElement('a');
-            downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", "nexus_focus_backup.json");
-            document.body.appendChild(downloadAnchor);
-            downloadAnchor.click();
-            downloadAnchor.remove();
-            showToast('Paket exportiert');
-        }
+        // 3. Analyze Extracted OCR Text for Coin Values
+        function processOcrResults(data) {
+            const rawText = data.text.trim();
+            const confidence = Math.round(data.confidence || 0);
 
-        function importJSON(event) {
-            const fileReader = new FileReader();
-            fileReader.onload = function(e) {
-                try {
-                    const importedTodos = JSON.parse(e.target.result);
-                    if (Array.isArray(importedTodos)) {
-                        mergeTodos(importedTodos);
-                        showToast('Paket erfolgreich zusammengeführt!');
-                    }
-                } catch (err) {
-                    showToast('Fehler beim Lesen der Datei');
-                }
-            };
-            fileReader.readAsText(event.target.files[0]);
-        }
+            console.log("OCR Raw Output:", rawText, "Confidence:", confidence);
 
-        function mergeTodos(remoteTodos) {
-            let updated = false;
-            remoteTodos.forEach(remoteItem => {
-                const exists = todos.find(t => t.id === remoteItem.id);
-                if (!exists) {
-                    todos.push(remoteItem);
-                    updated = true;
-                } else {
-                    Object.assign(exists, remoteItem);
-                }
-            });
-            if (updated || remoteTodos.length > 0) {
-                todos.sort((a, b) => b.id - a.id);
-                saveAndRender();
-            }
-        }
+            document.getElementById('rawText').innerText = rawText.replace(/\n/g, ' ') || "Kein Text erkannt";
+            document.getElementById('confidenceBadge').innerText = `Konfidenz: ${confidence}%`;
 
-        // --- CORE LOGIK & NOTIFICATIONS ---
-        async function toggleNotifications() {
-            if (!('Notification' in window)) return showToast('Push nicht unterstützt');
-            let permission = Notification.permission;
-            if (permission === 'default') permission = await Notification.requestPermission();
-            if (permission === 'granted') {
-                showToast('Push-Benachrichtigungen aktiv');
-                updateNotifButtonState(true);
+            // Coin pattern matching logic
+            const detectedCoin = parseCoinValue(rawText);
+
+            resultCard.classList.remove('hidden');
+
+            if (detectedCoin) {
+                document.getElementById('detectedValue').innerText = detectedCoin;
+                document.getElementById('fallbackMenu').classList.add('hidden');
+                showToast(`Münzwert erkannt: ${detectedCoin}`, "success");
             } else {
-                showToast('Berechtigung verweigert');
-                updateNotifButtonState(false);
+                // Fallback handling when pattern match fails or confidence is low
+                document.getElementById('detectedValue').innerText = "Nicht eindeutig";
+                document.getElementById('fallbackMenu').classList.remove('hidden');
+                showToast("Münze konnte nicht eindeutig bestimmt werden", "info");
             }
         }
 
-        function updateNotifButtonState(active) {
-            const btn = document.getElementById('notifBtn');
-            if (active || Notification.permission === 'granted') {
-                btn.classList.add('active');
-                btn.innerText = '🔔 Aktiv';
-            } else {
-                btn.classList.remove('active');
-                btn.innerText = '🔔 Push';
+        // Coin Regex/Pattern Parser
+        function parseCoinValue(text) {
+            const clean = text.toUpperCase().replace(/\s+/g, '');
+
+            // Explicit Patterns for Euro/Cent Coins
+            if (/\b2\b|2EURO|2€|2EVRO|2E/i.test(clean)) return "2 Euro";
+            if (/\b1\b|1EURO|1€|1EVRO|1E/i.test(clean)) return "1 Euro";
+            if (/50|50CENT|50CT/i.test(clean)) return "50 Cent";
+            if (/20|20CENT|20CT/i.test(clean)) return "20 Cent";
+            if (/10|10CENT|10CT/i.test(clean)) return "10 Cent";
+            if (/5CENT|5CT|\b5\b/i.test(clean)) return "5 Cent";
+            if (/2CENT|2CT/i.test(clean)) return "2 Cent";
+            if (/1CENT|1CT/i.test(clean)) return "1 Cent";
+
+            return null;
+        }
+
+        // Manual Selection Fallback
+        function selectManualValue(val) {
+            document.getElementById('detectedValue').innerText = val;
+            showToast(`Manuell gewählt: ${val}`, "success");
+        }
+
+        // 4. Rescan / Reset UI to Live Camera
+        function resetToLiveCamera() {
+            snapshotCanvas.classList.add('hidden');
+            resultCard.classList.add('hidden');
+            video.classList.remove('hidden');
+            scannerOverlay.classList.remove('hidden');
+
+            rescanBtn.classList.add('hidden');
+            captureBtn.classList.remove('hidden');
+
+            updateStatus("Kamera aktiv", true);
+        }
+
+        // Clean up camera stream when leaving page
+        window.onbeforeunload = () => {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
             }
-        }
-
-        function triggerTestPush() {
-            if (Notification.permission !== 'granted') return toggleNotifications();
-            showToast('Test-Push gesendet...');
-            if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-                navigator.serviceWorker.controller.postMessage({ type: 'TEST_PUSH' });
-            }
-        }
-
-        function syncWithServiceWorker() {
-            if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-                navigator.serviceWorker.controller.postMessage({ type: 'SYNC_TODOS', todos: todos });
-            }
-        }
-
-        function saveAndRender() {
-            localStorage.setItem('nexus_todos', JSON.stringify(todos));
-            syncWithServiceWorker();
-            render();
-        }
-
-        function render() {
-            const list = document.getElementById('todoList');
-            const count = document.getElementById('count');
-            const empty = document.getElementById('emptyState');
-            
-            list.innerHTML = '';
-            count.innerText = `${todos.length} Aufgaben`;
-            
-            if (todos.length === 0) {
-                empty.style.display = 'block';
-                return;
-            }
-            empty.style.display = 'none';
-
-            const now = new Date().getTime();
-
-            todos.forEach(todo => {
-                const li = document.createElement('li');
-                li.className = 'todo-item';
-                
-                let dueHtml = '';
-                if (todo.due) {
-                    const dueDate = new Date(todo.due);
-                    const isOverdue = now >= dueDate.getTime();
-                    const formattedDate = dueDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) + ', ' + dueDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-                    dueHtml = `<span class="todo-due ${isOverdue ? 'overdue' : ''}">⏰ Fällig: ${formattedDate}</span>`;
-                }
-
-                li.innerHTML = `
-                    <div class="todo-content">
-                        <span class="todo-text">${escapeHtml(todo.text)}</span>
-                        ${dueHtml}
-                    </div>
-                    <button class="check-btn" onclick="deleteTodo('${todo.id}')"></button>
-                `;
-                list.appendChild(li);
-            });
-        }
-
-        function addTodo() {
-            const input = document.getElementById('todoInput');
-            const dueInput = document.getElementById('dueDateInput');
-            const text = input.value.trim();
-            if (!text) return;
-
-            const newTodo = {
-                id: Date.now().toString(),
-                text: text,
-                due: dueInput.value || null,
-                notified: false
-            };
-
-            todos.unshift(newTodo);
-            input.value = '';
-            dueInput.value = '';
-            saveAndRender();
-            showToast('Aufgabe hinzugefügt');
-        }
-
-        function deleteTodo(id) {
-            todos = todos.filter(t => t.id !== id);
-            saveAndRender();
-            showToast('Erledigt & gelöscht');
-        }
-
-        document.getElementById('todoInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') addTodo();
-        });
-
-        function escapeHtml(str) {
-            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        }
-
-        updateNotifButtonState();
-        render();
+        };
     </script>
 </body>
 </html>
