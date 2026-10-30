@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nexus Coin Scanner - KI Münzerkennung</title>
+    <title>Nexus Coin Scanner - Batch Zähler</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -36,41 +36,38 @@
     <!-- Tesseract.js OCR CDN -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         body {
             font-family: 'Inter', sans-serif;
             background-color: #060d0e;
             color: #e2e8f0;
         }
 
-        /* Pulse Animations & Scanner Overlay */
         .scan-line {
             position: absolute;
             width: 100%;
             height: 3px;
             background: linear-gradient(90deg, transparent, #53A9AE, transparent);
             box-shadow: 0 0 15px #53A9AE;
-            animation: scan 2.5s infinite ease-in-out;
+            animation: scan 2s infinite ease-in-out;
         }
 
         @keyframes scan {
-            0% { top: 5%; opacity: 0.2; }
-            50% { top: 90%; opacity: 1; }
-            100% { top: 5%; opacity: 0.2; }
+            0% { top: 10%; opacity: 0.3; }
+            50% { top: 85%; opacity: 1; }
+            100% { top: 10%; opacity: 0.3; }
         }
 
-        /* Target Reticle Custom Styles */
         .reticle-corner {
             position: absolute;
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
             border-color: #53A9AE;
             border-style: solid;
         }
 
-        /* Glassmorphism Panels */
         .glass-panel {
-            background: rgba(19, 40, 42, 0.6);
+            background: rgba(19, 40, 42, 0.7);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(83, 169, 174, 0.2);
@@ -80,48 +77,58 @@
 <body class="min-h-screen flex flex-col justify-between selection:bg-nexus-500 selection:text-black">
 
     <!-- Header / Navigation -->
-    <header class="w-full glass-panel sticky top-0 z-50 border-b border-nexus-500/20 px-4 py-3">
+    <header class="w-full glass-panel sticky top-0 z-40 border-b border-nexus-500/20 px-4 py-3">
         <div class="max-w-4xl mx-auto flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-nexus-500/10 border border-nexus-500/40 flex items-center justify-center text-nexus-500 shadow-glow">
-                    <i class="fa-solid font-bold fa-coins text-xl"></i>
+                    <i class="fa-solid font-bold fa-layer-group text-xl"></i>
                 </div>
                 <div>
                     <h1 class="text-lg font-bold tracking-wider text-white flex items-center gap-2">
-                        NEXUS <span class="text-nexus-500 text-xs px-2 py-0.5 rounded-full bg-nexus-500/10 border border-nexus-500/30">COIN OCR</span>
+                        NEXUS <span class="text-nexus-500 text-xs px-2 py-0.5 rounded-full bg-nexus-500/10 border border-nexus-500/30">BATCH COUNTER</span>
                     </h1>
-                    <p class="text-xs text-slate-400">Client-seitige Live-Münzerkennung</p>
+                    <p class="text-xs text-slate-400">Schnelle Serien-Münzerfassung</p>
                 </div>
             </div>
-            <div id="statusBadge" class="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/80 border border-slate-800 text-xs text-slate-300">
-                <span id="statusIndicator" class="w-2 h-2 rounded-full bg-slate-500"></span>
-                <span id="statusBadgeText">Kamera inaktiv</span>
+            
+            <div class="flex items-center gap-3">
+                <button onclick="resetBatch()" class="text-xs px-3 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-rotate-left"></i> Reset
+                </button>
             </div>
         </div>
     </header>
 
     <!-- Main Content Container -->
-    <main class="flex-grow max-w-4xl w-full mx-auto p-4 sm:p-6 flex flex-col items-center justify-center gap-6">
+    <main class="flex-grow max-w-4xl w-full mx-auto p-4 sm:p-6 flex flex-col gap-6">
 
-        <!-- Informatives Banner bei Start -->
-        <div id="introCard" class="w-full glass-panel rounded-2xl p-6 text-center space-y-3 transition-all duration-300">
-            <div class="w-14 h-14 mx-auto rounded-full bg-nexus-500/10 border border-nexus-500/30 flex items-center justify-center text-nexus-500 text-2xl">
-                <i class="fa-solid fa-camera-rotate"></i>
+        <!-- Live Status Bar / Total Counter -->
+        <section class="w-full glass-panel rounded-2xl p-4 sm:p-6 grid grid-cols-2 sm:grid-cols-3 gap-4 border border-nexus-500/30 shadow-glow">
+            <div class="col-span-1">
+                <span class="text-xs text-slate-400 uppercase tracking-wider block font-medium">Gesamtsumme</span>
+                <div id="totalSum" class="text-3xl sm:text-4xl font-extrabold text-nexus-400 tracking-tight">0,00 €</div>
             </div>
-            <h2 class="text-xl font-semibold text-white">Münzwert schnell & unkompliziert scannen</h2>
-            <p class="text-sm text-slate-300 max-w-lg mx-auto">
-                Richte die Kamera direkt auf die Zahlenseite der Münze. Das Bild wird absolut privat 
-                <span class="text-nexus-500 font-medium">ausschließlich lokal in deinem Browser</span> verarbeitet und niemals gespeichert.
-            </p>
-        </div>
+            <div class="col-span-1 border-l border-slate-800 pl-4">
+                <span class="text-xs text-slate-400 uppercase tracking-wider block font-medium">Erfasste Münzen</span>
+                <div id="totalCount" class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">0</div>
+            </div>
+            <div class="col-span-2 sm:col-span-1 border-t sm:border-t-0 sm:border-l border-slate-800 pt-3 sm:pt-0 sm:pl-4 flex items-center justify-between sm:justify-center">
+                <button id="undoBtn" onclick="undoLastCoin()" disabled class="w-full py-2.5 px-4 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-400 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-slate-700 hover:text-white transition disabled:opacity-40 disabled:pointer-events-none">
+                    <i class="fa-solid fa-arrow-rotate-left"></i> Letzte Münze löschen
+                </button>
+            </div>
+        </section>
 
-        <!-- Camera / Preview Container -->
-        <div class="w-full relative max-w-lg aspect-square sm:aspect-[4/3] rounded-3xl overflow-hidden glass-panel border border-nexus-500/30 shadow-glow flex items-center justify-center bg-nexus-950">
+        <!-- Camera Viewport Container -->
+        <div class="w-full relative aspect-square sm:aspect-[16/9] max-h-[460px] rounded-3xl overflow-hidden glass-panel border border-nexus-500/30 shadow-glow flex items-center justify-center bg-nexus-950">
             
             <!-- Default Placeholder when camera is inactive -->
-            <div id="cameraPlaceholder" class="flex flex-col items-center gap-3 text-slate-500 p-6 text-center">
-                <i class="fa-solid fa-eye-slash text-5xl text-nexus-500/40"></i>
-                <p class="text-sm">Kamera ist derzeit ausgeschaltet</p>
+            <div id="cameraPlaceholder" class="flex flex-col items-center gap-3 text-slate-400 p-6 text-center">
+                <div class="w-16 h-16 rounded-full bg-nexus-500/10 border border-nexus-500/30 flex items-center justify-center text-nexus-500 text-2xl mb-1">
+                    <i class="fa-solid fa-camera"></i>
+                </div>
+                <h3 class="text-base font-semibold text-white">Serien-Scan starten</h3>
+                <p class="text-xs max-w-sm text-slate-400">Richte das Fadenkreuz nacheinander auf die Münzen deines Haufens. Fotos werden nicht auf dem Gerät gespeichert.</p>
             </div>
 
             <!-- Video Live Stream -->
@@ -130,107 +137,95 @@
             <!-- Snapshot Canvas Overlay for result preview -->
             <canvas id="snapshotCanvas" class="hidden w-full h-full object-cover"></canvas>
 
-            <!-- Scanning Overlay Frame (Visual Guidance) -->
+            <!-- Target Reticle & Scanner Overlay -->
             <div id="scannerOverlay" class="hidden absolute inset-0 pointer-events-none flex items-center justify-center">
                 <div class="scan-line"></div>
-                <!-- Circle Guide for Coin -->
-                <div class="w-56 h-56 sm:w-64 sm:h-64 rounded-full border-2 border-dashed border-nexus-500/60 flex items-center justify-center shadow-[0_0_50px_rgba(83,169,174,0.15)] animate-pulse">
-                    <span class="text-xs text-nexus-500/70 uppercase tracking-widest font-mono">Münze hier zentrieren</span>
+                <!-- Precision Target Ring -->
+                <div class="w-44 h-44 sm:w-52 sm:h-52 rounded-full border-2 border-nexus-400/80 flex items-center justify-center shadow-[0_0_40px_rgba(83,169,174,0.25)] relative">
+                    <div class="w-3 h-3 rounded-full bg-nexus-400 animate-ping"></div>
+                    <span class="absolute -bottom-7 text-[10px] text-nexus-400/90 font-mono tracking-widest uppercase bg-nexus-950/80 px-2 py-0.5 rounded border border-nexus-500/30">Münze zentrieren</span>
                 </div>
-                <!-- HUD Corner Accents -->
-                <div class="reticle-corner top-4 left-4 border-t-2 border-l-2 rounded-tl-lg"></div>
-                <div class="reticle-corner top-4 right-4 border-t-2 border-r-2 rounded-tr-lg"></div>
-                <div class="reticle-corner bottom-4 left-4 border-b-2 border-l-2 rounded-bl-lg"></div>
-                <div class="reticle-corner bottom-4 right-4 border-b-2 border-r-2 rounded-br-lg"></div>
+                <!-- Corner Indicators -->
+                <div class="reticle-corner top-4 left-4 border-t-2 border-l-2 rounded-tl-md"></div>
+                <div class="reticle-corner top-4 right-4 border-t-2 border-r-2 rounded-tr-md"></div>
+                <div class="reticle-corner bottom-4 left-4 border-b-2 border-l-2 rounded-bl-md"></div>
+                <div class="reticle-corner bottom-4 right-4 border-b-2 border-r-2 rounded-br-md"></div>
             </div>
 
-            <!-- Loading Spinner & Progress Overlay -->
-            <div id="loadingOverlay" class="hidden absolute inset-0 bg-nexus-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center space-y-4">
-                <div class="relative w-16 h-16">
-                    <div class="absolute inset-0 rounded-full border-4 border-nexus-500/20"></div>
-                    <div class="absolute inset-0 rounded-full border-4 border-nexus-500 border-t-transparent animate-spin"></div>
-                </div>
-                <div>
-                    <h3 id="loadingText" class="text-lg font-semibold text-white">Analysiere Münze...</h3>
-                    <p id="loadingDetail" class="text-xs text-nexus-400 font-mono mt-1">Tesseract OCR Engine startet...</p>
-                </div>
-                <!-- Progress Bar -->
-                <div class="w-48 bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                    <div id="progressBar" class="bg-nexus-500 h-full w-0 transition-all duration-200"></div>
-                </div>
+            <!-- Fast Progress Overlay -->
+            <div id="loadingOverlay" class="hidden absolute inset-0 bg-nexus-950/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center space-y-3 z-20">
+                <div class="w-10 h-10 rounded-full border-4 border-nexus-500/20 border-t-nexus-500 animate-spin"></div>
+                <span id="loadingDetail" class="text-xs font-mono text-nexus-400">Scan läuft...</span>
             </div>
         </div>
 
-        <!-- Action Buttons Bar -->
-        <div class="w-full max-w-lg flex flex-col gap-3">
-            <!-- Initial Start Camera Button -->
-            <button id="startCamBtn" onclick="initCamera()" class="w-full py-4 px-6 rounded-2xl bg-nexus-500 hover:bg-nexus-600 text-nexus-950 font-bold text-lg flex items-center justify-center gap-3 transition-all transform active:scale-95 shadow-glow hover:shadow-glow-lg">
-                <i class="fa-solid fa-camera"></i>
-                <span>Kamera starten</span>
+        <!-- Action Control Buttons -->
+        <div class="w-full flex flex-col sm:flex-row gap-3">
+            <button id="startCamBtn" onclick="initCamera()" class="w-full py-4 px-6 rounded-2xl bg-nexus-500 hover:bg-nexus-600 text-nexus-950 font-bold text-lg flex items-center justify-center gap-3 transition transform active:scale-95 shadow-glow">
+                <i class="fa-solid fa-power-off"></i>
+                <span>Kamera aktivieren</span>
             </button>
 
-            <!-- Capture Image Button (hidden initially) -->
-            <button id="captureBtn" onclick="captureAndAnalyze()" class="hidden w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-nexus-500 to-teal-400 hover:from-nexus-600 hover:to-teal-500 text-nexus-950 font-bold text-lg flex items-center justify-center gap-3 transition-all transform active:scale-95 shadow-glow">
-                <i class="fa-solid fa-circle-dot text-xl animate-ping"></i>
-                <span>Foto aufnehmen & Wert erkennen</span>
-            </button>
-
-            <!-- Reset / Rescan Button (hidden initially) -->
-            <button id="rescanBtn" onclick="resetToLiveCamera()" class="hidden w-full py-3 px-6 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-medium text-base flex items-center justify-center gap-2 border border-slate-700 transition-all">
-                <i class="fa-solid fa-rotate-left"></i>
-                <span>Erneut scannen</span>
+            <button id="captureBtn" onclick="captureAndAnalyze()" class="hidden w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-nexus-500 to-teal-400 hover:from-nexus-600 hover:to-teal-500 text-nexus-950 font-extrabold text-lg flex items-center justify-center gap-3 transition transform active:scale-95 shadow-glow">
+                <i class="fa-solid fa-expand text-xl"></i>
+                <span>Münze scannen</span>
             </button>
         </div>
 
-        <!-- Result Box Section -->
-        <div id="resultCard" class="hidden w-full max-w-lg glass-panel rounded-2xl p-6 transition-all duration-300">
-            <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
-                <h3 class="text-sm uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-2">
-                    <i class="fa-solid fa-microchip text-nexus-500"></i> Erkennungsergebnis
-                </h3>
-                <span id="confidenceBadge" class="text-xs px-2.5 py-1 rounded-full bg-nexus-500/10 text-nexus-400 border border-nexus-500/20 font-mono">
-                    Konfidenz: --%
-                </span>
+        <!-- History / Log Section -->
+        <section class="w-full glass-panel rounded-2xl p-5 border border-slate-800">
+            <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-between">
+                <span><i class="fa-solid fa-list-ol text-nexus-500 mr-2"></i>Erfassungsprotokoll</span>
+                <span id="logCount" class="font-mono text-nexus-400">0 Einträge</span>
+            </h3>
+            <div id="historyList" class="max-h-40 overflow-y-auto space-y-2 pr-1 text-sm text-slate-300">
+                <p id="emptyHistory" class="text-xs text-slate-500 text-center py-4">Noch keine Münzen gescannt.</p>
             </div>
-
-            <!-- Primary Result Display -->
-            <div id="primaryResultContainer" class="text-center py-4 bg-nexus-950/50 rounded-xl border border-nexus-500/20 mb-4">
-                <span class="text-xs text-slate-400 block mb-1">Ermittelter Wert</span>
-                <div id="detectedValue" class="text-4xl font-extrabold text-nexus-400 tracking-tight">--</div>
-            </div>
-
-            <!-- Raw Extracted OCR Text Details -->
-            <div class="space-y-2 text-xs">
-                <div class="flex justify-between text-slate-400">
-                    <span>Erkannter Text (Rohdaten):</span>
-                    <span id="rawText" class="font-mono text-slate-200 font-medium truncate max-w-[200px]">Keine Daten</span>
-                </div>
-            </div>
-
-            <!-- Fallback Manual Selection Menu (Shown if OCR is uncertain) -->
-            <div id="fallbackMenu" class="hidden mt-4 pt-4 border-t border-slate-800">
-                <p class="text-xs text-amber-400 mb-2 flex items-center gap-1.5">
-                    <i class="fa-solid fa-triangle-exclamation"></i> Ist das Ergebnis unscharf? Wähle den Wert manuell:
-                </p>
-                <div class="grid grid-cols-4 gap-2 text-xs font-semibold">
-                    <button onclick="selectManualValue('2 Euro')" class="p-2 rounded-lg bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-slate-200 transition">2 €</button>
-                    <button onclick="selectManualValue('1 Euro')" class="p-2 rounded-lg bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-slate-200 transition">1 €</button>
-                    <button onclick="selectManualValue('50 Cent')" class="p-2 rounded-lg bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-slate-200 transition">50 Ct</button>
-                    <button onclick="selectManualValue('20 Cent')" class="p-2 rounded-lg bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-slate-200 transition">20 Ct</button>
-                    <button onclick="selectManualValue('10 Cent')" class="p-2 rounded-lg bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-slate-200 transition">10 Ct</button>
-                    <button onclick="selectManualValue('5 Cent')" class="p-2 rounded-lg bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-slate-200 transition">5 Ct</button>
-                    <button onclick="selectManualValue('2 Cent')" class="p-2 rounded-lg bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-slate-200 transition">2 Ct</button>
-                    <button onclick="selectManualValue('1 Cent')" class="p-2 rounded-lg bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-slate-200 transition">1 Ct</button>
-                </div>
-            </div>
-        </div>
+        </section>
 
     </main>
 
-    <!-- Footer -->
-    <footer class="w-full text-center py-4 text-xs text-slate-500 border-t border-slate-900">
-        <p>Nexus Coin Scanner &bull; 100% On-Device OCR Analysis &bull; Keine Datenübertragung</p>
-    </footer>
+    <!-- HIGH-SPEED VALIDATION POPUP OVERLAY -->
+    <div id="validationModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="w-full max-w-md glass-panel rounded-3xl p-6 border border-nexus-500/40 shadow-glow-lg flex flex-col gap-5 animate-in fade-in zoom-in duration-150">
+            
+            <div class="text-center">
+                <span id="modalHeaderTitle" class="text-xs uppercase tracking-widest text-slate-400 font-mono">Erkennungsergebnis</span>
+                <div id="modalValueDisplay" class="text-4xl font-black text-nexus-400 my-2">2,00 €</div>
+                <p id="modalSubText" class="text-xs text-slate-300">Stimmt der Wert mit der fotografierten Münze überein?</p>
+            </div>
+
+            <!-- SUCCESS PATH: Quick Confirm Button -->
+            <div id="successActionBox" class="flex flex-col gap-2">
+                <button id="confirmBtn" onclick="confirmDetectedValue()" class="w-full py-3.5 px-6 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-base flex items-center justify-center gap-2 shadow-lg transition transform active:scale-95">
+                    <i class="fa-solid fa-check text-xl"></i>
+                    <span>Bestätigen (+ <span id="confirmValueLabel">2,00 €</span>)</span>
+                </button>
+                <button onclick="showCorrectionGrid()" class="w-full py-2 px-4 rounded-xl text-xs text-amber-400 hover:bg-amber-400/10 transition border border-amber-400/20">
+                    Falsch? Wert manuell korrigieren
+                </button>
+            </div>
+
+            <!-- FALLBACK & MANUAL CORRECTION GRID -->
+            <div id="manualGridBox" class="hidden flex flex-col gap-3 pt-2 border-t border-slate-800">
+                <span class="text-xs text-amber-400 font-medium text-center">Wähle den richtigen Münzwert aus:</span>
+                <div class="grid grid-cols-4 gap-2">
+                    <button onclick="commitCoin(2.00, '2 Euro')" class="p-3 rounded-xl bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-white font-bold text-sm transition">2 €</button>
+                    <button onclick="commitCoin(1.00, '1 Euro')" class="p-3 rounded-xl bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-white font-bold text-sm transition">1 €</button>
+                    <button onclick="commitCoin(0.50, '50 Cent')" class="p-3 rounded-xl bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-white font-bold text-sm transition">50 Ct</button>
+                    <button onclick="commitCoin(0.20, '20 Cent')" class="p-3 rounded-xl bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-white font-bold text-sm transition">20 Ct</button>
+                    <button onclick="commitCoin(0.10, '10 Cent')" class="p-3 rounded-xl bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-white font-bold text-sm transition">10 Ct</button>
+                    <button onclick="commitCoin(0.05, '5 Cent')" class="p-3 rounded-xl bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-white font-bold text-sm transition">5 Ct</button>
+                    <button onclick="commitCoin(0.02, '2 Cent')" class="p-3 rounded-xl bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-white font-bold text-sm transition">2 Ct</button>
+                    <button onclick="commitCoin(0.01, '1 Cent')" class="p-3 rounded-xl bg-slate-800 hover:bg-nexus-500 hover:text-black border border-slate-700 text-white font-bold text-sm transition">1 Ct</button>
+                </div>
+            </div>
+
+            <button onclick="closeModalAndResume()" class="text-xs text-slate-500 hover:text-slate-300 text-center py-1">
+                Scan abbrechen
+            </button>
+        </div>
+    </div>
 
     <!-- Notification Toast Element -->
     <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-800 border border-slate-700 text-slate-200 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-sm">
@@ -238,33 +233,23 @@
         <span id="toastMsg">Hinweis</span>
     </div>
 
-    <!-- Application JavaScript Logic -->
+    <!-- JavaScript Logic -->
     <script>
-        // Global State Variables
+        // State variables
         let videoStream = null;
+        let scannedHistory = []; // Array of { value: number, label: string, time: string }
+        let currentDetectedVal = null; // { value: number, label: string }
+
+        // DOM References
         const video = document.getElementById('videoElement');
         const snapshotCanvas = document.getElementById('snapshotCanvas');
         const startCamBtn = document.getElementById('startCamBtn');
         const captureBtn = document.getElementById('captureBtn');
-        const rescanBtn = document.getElementById('rescanBtn');
         const cameraPlaceholder = document.getElementById('cameraPlaceholder');
         const scannerOverlay = document.getElementById('scannerOverlay');
         const loadingOverlay = document.getElementById('loadingOverlay');
-        const resultCard = document.getElementById('resultCard');
-        const introCard = document.getElementById('introCard');
+        const validationModal = document.getElementById('validationModal');
 
-        // Status Indicator Updates
-        function updateStatus(text, active = false) {
-            document.getElementById('statusBadgeText').innerText = text;
-            const ind = document.getElementById('statusIndicator');
-            if(active) {
-                ind.className = "w-2 h-2 rounded-full bg-nexus-400 animate-pulse";
-            } else {
-                ind.className = "w-2 h-2 rounded-full bg-slate-500";
-            }
-        }
-
-        // Toast Notification System
         function showToast(message, type = 'info') {
             const toast = document.getElementById('toast');
             const toastMsg = document.getElementById('toastMsg');
@@ -282,13 +267,12 @@
             toast.classList.remove('translate-y-20', 'opacity-0');
             setTimeout(() => {
                 toast.classList.add('translate-y-20', 'opacity-0');
-            }, 3500);
+            }, 3000);
         }
 
-        // 1. Initialize Camera Function
+        // 1. Initialize Camera
         async function initCamera() {
             try {
-                // Constraints optimization for back-camera on mobile devices
                 const constraints = {
                     video: {
                         facingMode: { ideal: 'environment' },
@@ -300,171 +284,191 @@
                 videoStream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = videoStream;
 
-                // Toggle visibility elements
                 cameraPlaceholder.classList.add('hidden');
                 video.classList.remove('hidden');
                 scannerOverlay.classList.remove('hidden');
                 startCamBtn.classList.add('hidden');
                 captureBtn.classList.remove('hidden');
-                introCard.classList.add('hidden');
 
-                updateStatus("Kamera aktiv", true);
-                showToast("Kamera erfolgreich gestartet", "success");
+                showToast("Kamera für Reihen-Scan bereit", "success");
 
             } catch (error) {
                 console.error("Kamerafehler:", error);
-                showToast("Zugriff auf Kamera fehlgeschlagen. Bitte Berechtigungen prüfen.", "error");
-                updateStatus("Kamera-Fehler");
+                showToast("Zugriff auf Rückkamera fehlgeschlagen.", "error");
             }
         }
 
-        // 2. Capture Frame & Analyze OCR
+        // 2. High-Speed Capture and Processing
         async function captureAndAnalyze() {
             if (!videoStream) return;
 
-            // Prepare Canvas Snapshot
             const context = snapshotCanvas.getContext('2d');
             snapshotCanvas.width = video.videoWidth || 640;
             snapshotCanvas.height = video.videoHeight || 480;
 
-            // Draw current frame into hidden canvas
+            // Capture frame from video feed
             context.drawImage(video, 0, 0, snapshotCanvas.width, snapshotCanvas.height);
 
-            // Pre-process canvas for better OCR contrast (Grayscale + High Contrast)
+            // Canvas Preprocessing for OCR accuracy
             preprocessCanvas(context, snapshotCanvas.width, snapshotCanvas.height);
 
-            // Hide Video & Overlay, show static Snapshot Preview
-            video.classList.add('hidden');
-            scannerOverlay.classList.add('hidden');
-            snapshotCanvas.classList.remove('hidden');
-
-            // Toggle Buttons
-            captureBtn.classList.add('hidden');
-            rescanBtn.classList.remove('hidden');
-
-            // Show Loading Overlay
             loadingOverlay.classList.remove('hidden');
-            updateLoadingProgress("Münze vorbereiten...", 10);
 
             try {
-                // Perform OCR with Tesseract.js
                 const result = await Tesseract.recognize(
                     snapshotCanvas,
-                    'eng', // English language is usually best for digits & latin symbols
+                    'eng',
                     {
                         logger: m => {
                             if (m.status === 'recognizing text') {
                                 const prog = Math.round(m.progress * 100);
-                                updateLoadingProgress(`Text wird erkannt: ${prog}%`, prog);
-                            } else if(m.status === 'loading tesseract core') {
-                                updateLoadingProgress("Lade OCR-Core...", 25);
-                            } else if(m.status === 'initializing tesseract') {
-                                updateLoadingProgress("Initialisiere Engine...", 45);
+                                document.getElementById('loadingDetail').innerText = `Analysiere... ${prog}%`;
                             }
                         }
                     }
                 );
 
-                // Process Results
-                processOcrResults(result.data);
+                parseAndOpenPopup(result.data.text);
 
-            } catch (ocrError) {
-                console.error("OCR Fehler:", ocrError);
-                showToast("Fehler bei der Texterkennung", "error");
-                displayFallbackResult("Unbekannt", 0, "Erkennungsfehler");
+            } catch (err) {
+                console.error("OCR Error:", err);
+                openValidationModal(null);
             } finally {
                 loadingOverlay.classList.add('hidden');
             }
         }
 
-        // Image Preprocessing: Grayscale & Contrast boost for coins
+        // Preprocess Frame: Grayscale & Threshold Binarization
         function preprocessCanvas(ctx, width, height) {
             const imgData = ctx.getImageData(0, 0, width, height);
             const d = imgData.data;
             for (let i = 0; i < d.length; i += 4) {
-                // Calculate grayscale value
                 const avg = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
-                // Apply subtle contrast adjustment
-                const contrastFactor = 1.3;
-                const value = Math.min(255, Math.max(0, (avg - 128) * contrastFactor + 128));
-                
-                d[i] = value;     // R
-                d[i + 1] = value; // G
-                d[i + 2] = value; // B
+                // Binarization threshold
+                const v = avg > 110 ? 255 : 0;
+                d[i] = v;
+                d[i + 1] = v;
+                d[i + 2] = v;
             }
             ctx.putImageData(imgData, 0, 0);
         }
 
-        // Helper: Loading UI Update
-        function updateLoadingProgress(text, percent) {
-            document.getElementById('loadingDetail').innerText = text;
-            document.getElementById('progressBar').style.width = `${percent}%`;
+        // Parse OCR text to match coin values
+        function parseAndOpenPopup(text) {
+            const clean = text.toUpperCase().replace(/\s+/g, '');
+            let match = null;
+
+            if (/\b2\b|2EURO|2€|2EVRO/i.test(clean)) match = { value: 2.00, label: '2 Euro' };
+            else if (/\b1\b|1EURO|1€|1EVRO/i.test(clean)) match = { value: 1.00, label: '1 Euro' };
+            else if (/50|50CENT|50CT/i.test(clean)) match = { value: 0.50, label: '50 Cent' };
+            else if (/20|20CENT|20CT/i.test(clean)) match = { value: 0.20, label: '20 Cent' };
+            else if (/10|10CENT|10CT/i.test(clean)) match = { value: 0.10, label: '10 Cent' };
+            else if (/5CENT|5CT|\b5\b/i.test(clean)) match = { value: 0.05, label: '5 Cent' };
+            else if (/2CENT|2CT/i.test(clean)) match = { value: 0.02, label: '2 Cent' };
+            else if (/1CENT|1CT/i.test(clean)) match = { value: 0.01, label: '1 Cent' };
+
+            openValidationModal(match);
         }
 
-        // 3. Analyze Extracted OCR Text for Coin Values
-        function processOcrResults(data) {
-            const rawText = data.text.trim();
-            const confidence = Math.round(data.confidence || 0);
+        // Open Validation Popup Overlay
+        function openValidationModal(detected) {
+            currentDetectedVal = detected;
+            const successBox = document.getElementById('successActionBox');
+            const manualGrid = document.getElementById('manualGridBox');
+            const display = document.getElementById('modalValueDisplay');
+            const subText = document.getElementById('modalSubText');
+            const title = document.getElementById('modalHeaderTitle');
 
-            console.log("OCR Raw Output:", rawText, "Confidence:", confidence);
-
-            document.getElementById('rawText').innerText = rawText.replace(/\n/g, ' ') || "Kein Text erkannt";
-            document.getElementById('confidenceBadge').innerText = `Konfidenz: ${confidence}%`;
-
-            // Coin pattern matching logic
-            const detectedCoin = parseCoinValue(rawText);
-
-            resultCard.classList.remove('hidden');
-
-            if (detectedCoin) {
-                document.getElementById('detectedValue').innerText = detectedCoin;
-                document.getElementById('fallbackMenu').classList.add('hidden');
-                showToast(`Münzwert erkannt: ${detectedCoin}`, "success");
+            if (detected) {
+                title.innerText = "Münzwert erkannt";
+                title.className = "text-xs uppercase tracking-widest text-emerald-400 font-mono";
+                display.innerText = detected.label;
+                document.getElementById('confirmValueLabel').innerText = detected.label;
+                subText.innerText = "Stimmt der Wert überein?";
+                
+                successBox.classList.remove('hidden');
+                manualGrid.classList.add('hidden');
             } else {
-                // Fallback handling when pattern match fails or confidence is low
-                document.getElementById('detectedValue').innerText = "Nicht eindeutig";
-                document.getElementById('fallbackMenu').classList.remove('hidden');
-                showToast("Münze konnte nicht eindeutig bestimmt werden", "info");
+                title.innerText = "Wert nicht eindeutig";
+                title.className = "text-xs uppercase tracking-widest text-amber-400 font-mono";
+                display.innerText = "???";
+                subText.innerText = "Bitte wähle den gescannten Münzwert aus:";
+
+                successBox.classList.add('hidden');
+                manualGrid.classList.remove('hidden');
+            }
+
+            validationModal.classList.remove('hidden');
+        }
+
+        function showCorrectionGrid() {
+            document.getElementById('successActionBox').classList.add('hidden');
+            document.getElementById('manualGridBox').classList.remove('hidden');
+        }
+
+        function confirmDetectedValue() {
+            if (currentDetectedVal) {
+                commitCoin(currentDetectedVal.value, currentDetectedVal.label);
             }
         }
 
-        // Coin Regex/Pattern Parser
-        function parseCoinValue(text) {
-            const clean = text.toUpperCase().replace(/\s+/g, '');
+        // Commit Scanned Coin to History & Totals
+        function commitCoin(numVal, labelVal) {
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            scannedHistory.unshift({ value: numVal, label: labelVal, time: timeStr });
 
-            // Explicit Patterns for Euro/Cent Coins
-            if (/\b2\b|2EURO|2€|2EVRO|2E/i.test(clean)) return "2 Euro";
-            if (/\b1\b|1EURO|1€|1EVRO|1E/i.test(clean)) return "1 Euro";
-            if (/50|50CENT|50CT/i.test(clean)) return "50 Cent";
-            if (/20|20CENT|20CT/i.test(clean)) return "20 Cent";
-            if (/10|10CENT|10CT/i.test(clean)) return "10 Cent";
-            if (/5CENT|5CT|\b5\b/i.test(clean)) return "5 Cent";
-            if (/2CENT|2CT/i.test(clean)) return "2 Cent";
-            if (/1CENT|1CT/i.test(clean)) return "1 Cent";
-
-            return null;
+            updateTotalUI();
+            closeModalAndResume();
+            showToast(`+ ${labelVal} hinzugefügt`, "success");
         }
 
-        // Manual Selection Fallback
-        function selectManualValue(val) {
-            document.getElementById('detectedValue').innerText = val;
-            showToast(`Manuell gewählt: ${val}`, "success");
+        function closeModalAndResume() {
+            validationModal.classList.add('hidden');
+            currentDetectedVal = null;
         }
 
-        // 4. Rescan / Reset UI to Live Camera
-        function resetToLiveCamera() {
-            snapshotCanvas.classList.add('hidden');
-            resultCard.classList.add('hidden');
-            video.classList.remove('hidden');
-            scannerOverlay.classList.remove('hidden');
-
-            rescanBtn.classList.add('hidden');
-            captureBtn.classList.remove('hidden');
-
-            updateStatus("Kamera aktiv", true);
+        function undoLastCoin() {
+            if (scannedHistory.length > 0) {
+                const removed = scannedHistory.shift();
+                updateTotalUI();
+                showToast(`-${removed.label} entfernt`, "info");
+            }
         }
 
-        // Clean up camera stream when leaving page
+        function resetBatch() {
+            if (scannedHistory.length === 0) return;
+            scannedHistory = [];
+            updateTotalUI();
+            showToast("Zähler zurückgesetzt", "info");
+        }
+
+        function updateTotalUI() {
+            const sum = scannedHistory.reduce((acc, curr) => acc + curr.value, 0);
+            const count = scannedHistory.length;
+
+            document.getElementById('totalSum').innerText = sum.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+            document.getElementById('totalCount').innerText = count;
+            document.getElementById('logCount').innerText = `${count} Einträge`;
+            document.getElementById('undoBtn').disabled = count === 0;
+
+            // Render History List
+            const historyList = document.getElementById('historyList');
+            if (count === 0) {
+                historyList.innerHTML = '<p id="emptyHistory" class="text-xs text-slate-500 text-center py-4">Noch keine Münzen gescannt.</p>';
+                return;
+            }
+
+            historyList.innerHTML = scannedHistory.map((item, idx) => `
+                <div class="flex items-center justify-between p-2.5 rounded-xl bg-nexus-950/60 border border-slate-800 text-xs">
+                    <div class="flex items-center gap-3">
+                        <span class="w-6 h-6 rounded-full bg-nexus-500/10 border border-nexus-500/30 text-nexus-400 flex items-center justify-center font-mono text-[10px]">#${count - idx}</span>
+                        <span class="font-bold text-white">${item.label}</span>
+                    </div>
+                    <span class="font-mono text-slate-400">${item.time}</span>
+                </div>
+            `).join('');
+        }
+
         window.onbeforeunload = () => {
             if (videoStream) {
                 videoStream.getTracks().forEach(track => track.stop());
